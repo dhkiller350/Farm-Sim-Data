@@ -42,8 +42,9 @@
       <div class="farm-name-badge">🌾 <span id="farmNameDisplay">My Farm</span></div>
       <button class="btn btn-sm btn-outline" id="editFarmNameBtn"><i class="fa fa-pen"></i></button>
       <div class="season-badge" id="seasonBadge">🌸 Spring – Year 1</div>
-      <!-- Live balance in topbar -->
       <div class="topbar-balance" id="topbarBalance">💰 $0.00</div>
+      <!-- RESET BUTTON -->
+      <button class="btn btn-sm btn-danger" id="resetBtn" title="Reset all data"><i class="fa fa-rotate-left"></i> Reset</button>
     </div>
   </header>
 
@@ -121,8 +122,6 @@
 
   <!-- ===== WALLET PAGE ===== -->
   <section class="page" id="page-wallet">
-
-    <!-- Big balance display -->
     <div class="wallet-hero">
       <div class="wallet-hero-label">Current Balance</div>
       <div class="wallet-hero-amount" id="walletHeroAmount">$0.00</div>
@@ -130,8 +129,6 @@
     </div>
 
     <div class="dashboard-grid">
-
-      <!-- Set Starting Balance -->
       <div class="card">
         <div class="card-header"><i class="fa fa-coins"></i> Set / Update Starting Balance</div>
         <div class="card-body">
@@ -152,7 +149,6 @@
         </div>
       </div>
 
-      <!-- Manual Adjustment -->
       <div class="card">
         <div class="card-header"><i class="fa fa-plus-minus"></i> Manual Balance Adjustment</div>
         <div class="card-body">
@@ -180,7 +176,6 @@
         </div>
       </div>
 
-      <!-- Transaction History -->
       <div class="card full-width">
         <div class="card-header">
           <i class="fa fa-history"></i> Transaction History
@@ -189,13 +184,7 @@
         <div class="card-body">
           <table class="data-table">
             <thead>
-              <tr>
-                <th>Date / Time</th>
-                <th>Type</th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th>Balance After</th>
-              </tr>
+              <tr><th>Date / Time</th><th>Type</th><th>Description</th><th>Amount</th><th>Balance After</th></tr>
             </thead>
             <tbody id="walletHistoryBody">
               <tr><td colspan="5" class="empty-row">No transactions yet.</td></tr>
@@ -203,7 +192,6 @@
           </table>
         </div>
       </div>
-
     </div>
   </section>
 
@@ -493,9 +481,7 @@
         <div class="form-group"><label>Buyer / Location</label><input type="text" id="saleBuyer" placeholder="e.g. Grain Mill, Farm Store..." /></div>
         <div class="form-group full-span"><label>Notes</label><textarea id="saleNotes" rows="2"></textarea></div>
         <div class="form-group full-span">
-          <div class="sale-wallet-notice" id="saleWalletNotice">
-            <i class="fa fa-info-circle"></i> This sale total will be <strong>added to your balance</strong> automatically.
-          </div>
+          <div class="sale-wallet-notice"><i class="fa fa-info-circle"></i> This sale total will be <strong>added to your balance</strong> automatically.</div>
         </div>
         <div class="form-group full-span modal-actions">
           <button type="button" class="btn btn-outline" data-modal="saleModal">Cancel</button>
@@ -528,9 +514,7 @@
         <div class="form-group"><label>Store / Seller</label><input type="text" id="purchaseSeller" placeholder="e.g. Farm Store, Dealer..." /></div>
         <div class="form-group full-span"><label>Notes</label><textarea id="purchaseNotes" rows="2"></textarea></div>
         <div class="form-group full-span">
-          <div class="sale-wallet-notice warning" id="purchaseWalletNotice">
-            <i class="fa fa-info-circle"></i> This purchase total will be <strong>deducted from your balance</strong> automatically.
-          </div>
+          <div class="sale-wallet-notice warning"><i class="fa fa-info-circle"></i> This purchase total will be <strong>deducted from your balance</strong> automatically.</div>
         </div>
         <div class="form-group full-span modal-actions">
           <button type="button" class="btn btn-outline" data-modal="purchaseModal">Cancel</button>
@@ -592,7 +576,7 @@
   </div>
 </div>
 
-<!-- Confirm Delete -->
+<!-- Confirm Delete Modal (generic) -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal" style="max-width:380px">
     <div class="modal-header"><h3>⚠️ Confirm Delete</h3><button class="modal-close" data-modal="confirmModal"><i class="fa fa-times"></i></button></div>
@@ -601,6 +585,37 @@
       <div class="modal-actions">
         <button class="btn btn-outline" data-modal="confirmModal">Cancel</button>
         <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== RESET CONFIRMATION MODAL ===== -->
+<div class="modal-overlay" id="resetModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>🔴 Reset All Data</h3>
+      <button class="modal-close" data-modal="resetModal"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="reset-warning-box">
+        <i class="fa fa-triangle-exclamation"></i>
+        <div>
+          <strong>This will permanently delete EVERYTHING:</strong>
+          <ul style="margin-top:0.5rem;padding-left:1.2rem;color:var(--text-secondary);font-size:0.85rem;line-height:1.8">
+            <li>All fields, equipment, harvests</li>
+            <li>All sales, purchases, finances</li>
+            <li>All animals and activity log</li>
+            <li>Your entire wallet &amp; balance history</li>
+            <li>Farm name, season, and year</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin:1rem 0 0.5rem;font-size:0.88rem;color:var(--text-secondary);">Type <strong style="color:var(--accent-red)">RESET</strong> below to confirm:</p>
+      <input type="text" id="resetConfirmInput" placeholder="Type RESET to confirm" autocomplete="off" />
+      <div class="modal-actions" style="margin-top:1rem;">
+        <button class="btn btn-outline" data-modal="resetModal">Cancel</button>
+        <button class="btn btn-danger" id="confirmResetBtn"><i class="fa fa-rotate-left"></i> Reset Everything</button>
       </div>
     </div>
   </div>
