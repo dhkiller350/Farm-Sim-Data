@@ -6,27 +6,54 @@
   <title>Farm Sim 25 – Farm Manager</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <!-- Tractor emoji favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚜</text></svg>" />
 </head>
 <body>
 
 <!-- Sidebar -->
 <nav class="sidebar" id="sidebar">
   <div class="sidebar-header">
-    <span class="logo-text">🚜 Farm Manager</span>
-    <button class="sidebar-toggle" id="sidebarToggle"><i class="fa fa-bars"></i></button>
+    <div class="logo-wrap">
+      <div class="logo-icon"><i class="fa fa-tractor"></i></div>
+      <div class="logo-text-wrap">
+        <span class="logo-text">Farm Manager</span>
+        <span class="logo-sub">FS25 Tracker</span>
+      </div>
+    </div>
+    <button class="sidebar-toggle" id="sidebarToggle"><i class="fa fa-chevron-left"></i></button>
   </div>
+
+  <div class="nav-section-label">OVERVIEW</div>
   <ul class="nav-links">
-    <li><a href="#" class="nav-link active" data-page="dashboard"><i class="fa fa-tachometer-alt"></i><span>Dashboard</span></a></li>
+    <li><a href="#" class="nav-link active" data-page="dashboard"><i class="fa fa-house"></i><span>Dashboard</span></a></li>
     <li><a href="#" class="nav-link" data-page="wallet"><i class="fa fa-wallet"></i><span>Wallet / Balance</span></a></li>
+  </ul>
+
+  <div class="nav-section-label">FARM</div>
+  <ul class="nav-links">
     <li><a href="#" class="nav-link" data-page="fields"><i class="fa fa-seedling"></i><span>Fields</span></a></li>
     <li><a href="#" class="nav-link" data-page="equipment"><i class="fa fa-tractor"></i><span>Equipment</span></a></li>
     <li><a href="#" class="nav-link" data-page="crops"><i class="fa fa-wheat-awn"></i><span>Crops & Harvest</span></a></li>
+    <li><a href="#" class="nav-link" data-page="animals"><i class="fa fa-horse"></i><span>Animals</span></a></li>
+  </ul>
+
+  <div class="nav-section-label">FINANCE</div>
+  <ul class="nav-links">
     <li><a href="#" class="nav-link" data-page="sales"><i class="fa fa-dollar-sign"></i><span>Sales</span></a></li>
     <li><a href="#" class="nav-link" data-page="purchases"><i class="fa fa-shopping-cart"></i><span>Purchases</span></a></li>
     <li><a href="#" class="nav-link" data-page="finance"><i class="fa fa-chart-line"></i><span>Finances</span></a></li>
-    <li><a href="#" class="nav-link" data-page="animals"><i class="fa fa-horse"></i><span>Animals</span></a></li>
   </ul>
-  <div class="sidebar-footer">FS25 Farm Manager v1.1</div>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-footer-inner">
+      <div class="footer-avatar"><i class="fa fa-user"></i></div>
+      <div class="footer-info">
+        <span class="footer-name" id="sidebarFarmName">My Farm</span>
+        <span class="footer-version">v1.2</span>
+      </div>
+    </div>
+  </div>
 </nav>
 
 <!-- Main Content -->
@@ -36,123 +63,224 @@
   <header class="topbar">
     <div class="topbar-left">
       <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fa fa-bars"></i></button>
-      <h1 class="page-title" id="pageTitle">Dashboard</h1>
+      <div class="breadcrumb">
+        <span class="breadcrumb-icon" id="breadcrumbIcon">🏠</span>
+        <h1 class="page-title" id="pageTitle">Dashboard</h1>
+      </div>
     </div>
     <div class="topbar-right">
-      <div class="farm-name-badge">🌾 <span id="farmNameDisplay">My Farm</span></div>
-      <button class="btn btn-sm btn-outline" id="editFarmNameBtn"><i class="fa fa-pen"></i></button>
-      <div class="season-badge" id="seasonBadge">🌸 Spring – Year 1</div>
-      <div class="topbar-balance" id="topbarBalance">💰 $0.00</div>
-      <!-- RESET BUTTON -->
-      <button class="btn btn-sm btn-danger" id="resetBtn" title="Reset all data"><i class="fa fa-rotate-left"></i> Reset</button>
+      <div class="topbar-farm-pill">
+        <span class="farm-pill-icon">🌾</span>
+        <span id="farmNameDisplay">My Farm</span>
+        <button class="btn btn-xs btn-ghost" id="editFarmNameBtn"><i class="fa fa-pen"></i></button>
+      </div>
+      <div class="season-chip" id="seasonBadge"><span>🌸</span> Spring – Year 1</div>
+      <div class="topbar-balance" id="topbarBalance">
+        <i class="fa fa-coins"></i>
+        <span id="topbarBalanceAmt">$0.00</span>
+      </div>
+      <button class="btn btn-sm btn-danger-outline" id="resetBtn" title="Reset all data">
+        <i class="fa fa-rotate-left"></i><span class="btn-label"> Reset</span>
+      </button>
     </div>
   </header>
 
   <!-- ===== DASHBOARD ===== -->
   <section class="page active" id="page-dashboard">
-    <div class="stats-grid">
-      <div class="stat-card green">
-        <div class="stat-icon"><i class="fa fa-wallet"></i></div>
-        <div class="stat-info">
-          <p class="stat-label">Current Balance</p>
-          <h2 class="stat-value" id="statBalance">$0.00</h2>
-          <p class="stat-sub" id="statBalanceSub">Starting: $0.00</p>
+
+    <!-- Hero Banner -->
+    <div class="dashboard-hero">
+      <div class="hero-content">
+        <div class="hero-greeting">Good farming! 👋</div>
+        <div class="hero-farm-name" id="heroBigFarmName">My Farm</div>
+        <div class="hero-meta">
+          <span class="hero-chip"><i class="fa fa-sun"></i> <span id="heroSeason">Spring – Year 1</span></span>
+          <span class="hero-chip green"><i class="fa fa-circle-check"></i> All systems active</span>
         </div>
       </div>
-      <div class="stat-card blue">
-        <div class="stat-icon"><i class="fa fa-seedling"></i></div>
-        <div class="stat-info"><p class="stat-label">Fields Owned</p><h2 class="stat-value" id="statFields">0</h2></div>
-      </div>
-      <div class="stat-card orange">
-        <div class="stat-icon"><i class="fa fa-tractor"></i></div>
-        <div class="stat-info"><p class="stat-label">Equipment</p><h2 class="stat-value" id="statEquipment">0</h2></div>
-      </div>
-      <div class="stat-card red">
-        <div class="stat-icon"><i class="fa fa-chart-line"></i></div>
-        <div class="stat-info"><p class="stat-label">Total Sales</p><h2 class="stat-value" id="statSales">$0</h2></div>
-      </div>
-      <div class="stat-card purple">
-        <div class="stat-icon"><i class="fa fa-shopping-cart"></i></div>
-        <div class="stat-info"><p class="stat-label">Total Purchases</p><h2 class="stat-value" id="statPurchases">$0</h2></div>
-      </div>
-      <div class="stat-card teal">
-        <div class="stat-icon"><i class="fa fa-wheat-awn"></i></div>
-        <div class="stat-info"><p class="stat-label">Total Harvested</p><h2 class="stat-value" id="statHarvest">0 L</h2></div>
+      <div class="hero-balance-card">
+        <div class="hero-balance-label"><i class="fa fa-wallet"></i> Current Balance</div>
+        <div class="hero-balance-amt" id="heroBalance">$0.00</div>
+        <div class="hero-balance-sub" id="heroBalanceSub">Starting: $0.00</div>
+        <button class="btn btn-sm btn-white-ghost" onclick="navigateTo('wallet')">Manage Wallet →</button>
       </div>
     </div>
 
+    <!-- Stat Cards -->
+    <div class="stats-grid">
+      <div class="stat-card" data-color="green">
+        <div class="stat-card-inner">
+          <div class="stat-icon-wrap green"><i class="fa fa-seedling"></i></div>
+          <div class="stat-info">
+            <p class="stat-label">Fields Owned</p>
+            <h2 class="stat-value" id="statFields">0</h2>
+            <p class="stat-trend neutral">–</p>
+          </div>
+        </div>
+        <div class="stat-card-bar green"></div>
+      </div>
+      <div class="stat-card" data-color="blue">
+        <div class="stat-card-inner">
+          <div class="stat-icon-wrap blue"><i class="fa fa-tractor"></i></div>
+          <div class="stat-info">
+            <p class="stat-label">Equipment</p>
+            <h2 class="stat-value" id="statEquipment">0</h2>
+            <p class="stat-trend neutral">–</p>
+          </div>
+        </div>
+        <div class="stat-card-bar blue"></div>
+      </div>
+      <div class="stat-card" data-color="emerald">
+        <div class="stat-card-inner">
+          <div class="stat-icon-wrap emerald"><i class="fa fa-arrow-trend-up"></i></div>
+          <div class="stat-info">
+            <p class="stat-label">Total Sales</p>
+            <h2 class="stat-value" id="statSales">$0</h2>
+            <p class="stat-trend positive" id="statSalesTrend">+$0 this session</p>
+          </div>
+        </div>
+        <div class="stat-card-bar emerald"></div>
+      </div>
+      <div class="stat-card" data-color="red">
+        <div class="stat-card-inner">
+          <div class="stat-icon-wrap red"><i class="fa fa-cart-shopping"></i></div>
+          <div class="stat-info">
+            <p class="stat-label">Total Purchases</p>
+            <h2 class="stat-value" id="statPurchases">$0</h2>
+            <p class="stat-trend negative" id="statPurchasesTrend">-$0 this session</p>
+          </div>
+        </div>
+        <div class="stat-card-bar red"></div>
+      </div>
+      <div class="stat-card" data-color="amber">
+        <div class="stat-card-inner">
+          <div class="stat-icon-wrap amber"><i class="fa fa-wheat-awn"></i></div>
+          <div class="stat-info">
+            <p class="stat-label">Total Harvested</p>
+            <h2 class="stat-value" id="statHarvest">0 L</h2>
+            <p class="stat-trend neutral">Across all fields</p>
+          </div>
+        </div>
+        <div class="stat-card-bar amber"></div>
+      </div>
+      <div class="stat-card" data-color="purple">
+        <div class="stat-card-inner">
+          <div class="stat-icon-wrap purple"><i class="fa fa-scale-balanced"></i></div>
+          <div class="stat-info">
+            <p class="stat-label">Net Profit</p>
+            <h2 class="stat-value" id="statNetProfit">$0</h2>
+            <p class="stat-trend neutral" id="statNetTrend">Sales minus purchases</p>
+          </div>
+        </div>
+        <div class="stat-card-bar purple"></div>
+      </div>
+    </div>
+
+    <!-- Dashboard Grid -->
     <div class="dashboard-grid">
-      <div class="card">
-        <div class="card-header"><i class="fa fa-clock"></i> Recent Activity</div>
-        <div class="card-body">
+
+      <!-- Quick Actions -->
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <span><i class="fa fa-bolt"></i> Quick Actions</span>
+        </div>
+        <div class="dash-card-body">
+          <div class="quick-grid">
+            <button class="quick-btn green" onclick="navigateTo('wallet')"><i class="fa fa-wallet"></i><span>Set Balance</span></button>
+            <button class="quick-btn blue" onclick="navigateTo('equipment');setTimeout(()=>document.getElementById('addEquipBtn').click(),200)"><i class="fa fa-tractor"></i><span>Add Equipment</span></button>
+            <button class="quick-btn emerald" onclick="navigateTo('sales');setTimeout(()=>document.getElementById('addSaleBtn').click(),200)"><i class="fa fa-dollar-sign"></i><span>Log Sale</span></button>
+            <button class="quick-btn red" onclick="navigateTo('purchases');setTimeout(()=>document.getElementById('addPurchaseBtn').click(),200)"><i class="fa fa-shopping-cart"></i><span>Log Purchase</span></button>
+            <button class="quick-btn amber" onclick="navigateTo('crops');setTimeout(()=>document.getElementById('addHarvestBtn').click(),200)"><i class="fa fa-wheat-awn"></i><span>Log Harvest</span></button>
+            <button class="quick-btn purple" onclick="navigateTo('animals');setTimeout(()=>document.getElementById('addAnimalBtn').click(),200)"><i class="fa fa-horse"></i><span>Add Animal</span></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity Feed -->
+      <div class="dash-card">
+        <div class="dash-card-header">
+          <span><i class="fa fa-clock-rotate-left"></i> Recent Activity</span>
+          <span class="dash-card-badge" id="activityCount">0</span>
+        </div>
+        <div class="dash-card-body no-pad">
           <ul class="activity-list" id="activityList">
-            <li class="activity-empty">No activity yet. Start tracking your farm!</li>
+            <li class="activity-empty"><i class="fa fa-seedling"></i> No activity yet — start tracking!</li>
           </ul>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header"><i class="fa fa-plus-circle"></i> Quick Add</div>
-        <div class="card-body quick-add-grid">
-          <button class="btn btn-green" onclick="navigateTo('wallet')"><i class="fa fa-wallet"></i> Set Balance</button>
-          <button class="btn btn-blue" onclick="navigateTo('equipment');setTimeout(()=>document.getElementById('addEquipBtn').click(),200)"><i class="fa fa-tractor"></i> Add Equipment</button>
-          <button class="btn btn-orange" onclick="navigateTo('sales');setTimeout(()=>document.getElementById('addSaleBtn').click(),200)"><i class="fa fa-dollar-sign"></i> Log Sale</button>
-          <button class="btn btn-purple" onclick="navigateTo('purchases');setTimeout(()=>document.getElementById('addPurchaseBtn').click(),200)"><i class="fa fa-shopping-cart"></i> Log Purchase</button>
-          <button class="btn btn-teal" onclick="navigateTo('crops');setTimeout(()=>document.getElementById('addHarvestBtn').click(),200)"><i class="fa fa-wheat-awn"></i> Log Harvest</button>
-          <button class="btn btn-red" onclick="navigateTo('animals');setTimeout(()=>document.getElementById('addAnimalBtn').click(),200)"><i class="fa fa-horse"></i> Add Animal</button>
+      <!-- Finance Chart -->
+      <div class="dash-card span-2">
+        <div class="dash-card-header">
+          <span><i class="fa fa-chart-column"></i> Income vs Expenses</span>
+          <div class="chart-legend">
+            <span class="legend-dot green"></span><span>Income</span>
+            <span class="legend-dot red"></span><span>Expenses</span>
+            <span class="legend-dot blue"></span><span>Net</span>
+          </div>
+        </div>
+        <div class="dash-card-body">
+          <canvas id="financeChart" height="90"></canvas>
         </div>
       </div>
 
-      <div class="card full-width">
-        <div class="card-header"><i class="fa fa-map"></i> Field Overview</div>
-        <div class="card-body">
+      <!-- Field Overview -->
+      <div class="dash-card span-2">
+        <div class="dash-card-header">
+          <span><i class="fa fa-map"></i> Field Overview</span>
+          <button class="btn btn-xs btn-ghost" onclick="navigateTo('fields')">View all →</button>
+        </div>
+        <div class="dash-card-body no-pad">
           <table class="data-table">
-            <thead><tr><th>Field</th><th>Hectares</th><th>Crop</th><th>Status</th><th>Soil Quality</th></tr></thead>
-            <tbody id="dashFieldBody"><tr><td colspan="5" class="empty-row">No fields added yet.</td></tr></tbody>
+            <thead><tr><th>Field</th><th>Hectares</th><th>Crop</th><th>Status</th><th>Soil</th></tr></thead>
+            <tbody id="dashFieldBody"><tr><td colspan="5" class="empty-row"><i class="fa fa-seedling"></i> No fields added yet.</td></tr></tbody>
           </table>
         </div>
       </div>
 
-      <div class="card full-width">
-        <div class="card-header"><i class="fa fa-chart-bar"></i> Income vs Expenses</div>
-        <div class="card-body"><canvas id="financeChart" height="80"></canvas></div>
-      </div>
     </div>
   </section>
 
   <!-- ===== WALLET PAGE ===== -->
   <section class="page" id="page-wallet">
     <div class="wallet-hero">
-      <div class="wallet-hero-label">Current Balance</div>
-      <div class="wallet-hero-amount" id="walletHeroAmount">$0.00</div>
-      <div class="wallet-hero-sub" id="walletHeroSub">Starting balance: $0.00 &nbsp;|&nbsp; +$0.00 from sales &nbsp;|&nbsp; -$0.00 from purchases</div>
+      <div class="wallet-hero-bg"></div>
+      <div class="wallet-hero-content">
+        <div class="wallet-hero-label"><i class="fa fa-wallet"></i> Current Balance</div>
+        <div class="wallet-hero-amount" id="walletHeroAmount">$0.00</div>
+        <div class="wallet-hero-pills" id="walletHeroSub">
+          <span class="wallet-pill start">🏁 Starting: $0.00</span>
+          <span class="wallet-pill green">💰 +$0.00 from sales</span>
+          <span class="wallet-pill red">🛒 -$0.00 from purchases</span>
+        </div>
+      </div>
     </div>
 
     <div class="dashboard-grid">
-      <div class="card">
-        <div class="card-header"><i class="fa fa-coins"></i> Set / Update Starting Balance</div>
-        <div class="card-body">
-          <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem;">Enter your current in-game money. This sets your base balance — sales and purchases are tracked on top of this.</p>
+      <div class="dash-card">
+        <div class="dash-card-header"><span><i class="fa fa-coins"></i> Set Starting Balance</span></div>
+        <div class="dash-card-body">
+          <p class="form-hint">Enter your current in-game money to set your base. Sales and purchases track on top of this.</p>
           <form id="startingBalanceForm" class="form-grid">
             <div class="form-group full-span">
               <label>Starting Balance ($)</label>
-              <input type="number" id="startingBalanceInput" step="0.01" min="0" placeholder="e.g. 150000" required />
+              <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="startingBalanceInput" step="0.01" min="0" placeholder="e.g. 150000" required /></div>
             </div>
             <div class="form-group full-span">
               <label>Note (optional)</label>
               <input type="text" id="startingBalanceNote" placeholder="e.g. New game start, loaded save..." />
             </div>
             <div class="form-group full-span">
-              <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Set Starting Balance</button>
+              <button type="submit" class="btn btn-primary btn-full"><i class="fa fa-save"></i> Set Starting Balance</button>
             </div>
           </form>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-header"><i class="fa fa-plus-minus"></i> Manual Balance Adjustment</div>
-        <div class="card-body">
-          <p style="font-size:0.85rem;color:var(--text-secondary);margin-bottom:1rem;">Add or subtract money manually (e.g. mission rewards, loans, corrections).</p>
+      <div class="dash-card">
+        <div class="dash-card-header"><span><i class="fa fa-plus-minus"></i> Manual Adjustment</span></div>
+        <div class="dash-card-body">
+          <p class="form-hint">Add or subtract money manually — mission rewards, loans, corrections.</p>
           <form id="manualAdjustForm" class="form-grid">
             <div class="form-group">
               <label>Type</label>
@@ -163,32 +291,28 @@
             </div>
             <div class="form-group">
               <label>Amount ($)</label>
-              <input type="number" id="adjustAmount" step="0.01" min="0.01" placeholder="e.g. 5000" required />
+              <div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="adjustAmount" step="0.01" min="0.01" placeholder="5000" required /></div>
             </div>
             <div class="form-group full-span">
               <label>Reason / Note</label>
               <input type="text" id="adjustNote" placeholder="e.g. Mission reward, Loan, Correction..." required />
             </div>
             <div class="form-group full-span">
-              <button type="submit" class="btn btn-primary"><i class="fa fa-check"></i> Apply Adjustment</button>
+              <button type="submit" class="btn btn-primary btn-full"><i class="fa fa-check"></i> Apply Adjustment</button>
             </div>
           </form>
         </div>
       </div>
 
-      <div class="card full-width">
-        <div class="card-header">
-          <i class="fa fa-history"></i> Transaction History
-          <button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="clearWalletHistory()"><i class="fa fa-trash"></i> Clear History</button>
+      <div class="dash-card span-2">
+        <div class="dash-card-header">
+          <span><i class="fa fa-receipt"></i> Transaction History</span>
+          <button class="btn btn-xs btn-ghost-danger" onclick="clearWalletHistory()"><i class="fa fa-trash"></i> Clear</button>
         </div>
-        <div class="card-body">
+        <div class="dash-card-body no-pad">
           <table class="data-table">
-            <thead>
-              <tr><th>Date / Time</th><th>Type</th><th>Description</th><th>Amount</th><th>Balance After</th></tr>
-            </thead>
-            <tbody id="walletHistoryBody">
-              <tr><td colspan="5" class="empty-row">No transactions yet.</td></tr>
-            </tbody>
+            <thead><tr><th>Date / Time</th><th>Type</th><th>Description</th><th>Amount</th><th>Balance After</th></tr></thead>
+            <tbody id="walletHistoryBody"><tr><td colspan="5" class="empty-row">No transactions yet.</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -200,12 +324,12 @@
     <div class="page-actions">
       <button class="btn btn-primary" id="addFieldBtn"><i class="fa fa-plus"></i> Add Field</button>
     </div>
-    <div class="card">
-      <div class="card-header"><i class="fa fa-seedling"></i> My Fields</div>
-      <div class="card-body">
+    <div class="dash-card">
+      <div class="dash-card-header"><span><i class="fa fa-seedling"></i> My Fields</span><span class="dash-card-badge" id="fieldCount">0</span></div>
+      <div class="dash-card-body no-pad">
         <table class="data-table">
-          <thead><tr><th>#</th><th>Name</th><th>Hectares</th><th>Crop</th><th>Status</th><th>Soil Quality</th><th>Hired Help</th><th>Notes</th><th>Actions</th></tr></thead>
-          <tbody id="fieldTableBody"><tr><td colspan="9" class="empty-row">No fields added yet.</td></tr></tbody>
+          <thead><tr><th>#</th><th>Name</th><th>Hectares</th><th>Crop</th><th>Status</th><th>Soil</th><th>Hired</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody id="fieldTableBody"><tr><td colspan="9" class="empty-row"><i class="fa fa-seedling"></i> No fields added yet.</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -216,12 +340,12 @@
     <div class="page-actions">
       <button class="btn btn-primary" id="addEquipBtn"><i class="fa fa-plus"></i> Add Equipment</button>
     </div>
-    <div class="card">
-      <div class="card-header"><i class="fa fa-tractor"></i> Equipment Inventory</div>
-      <div class="card-body">
+    <div class="dash-card">
+      <div class="dash-card-header"><span><i class="fa fa-tractor"></i> Equipment Inventory</span><span class="dash-card-badge" id="equipCount">0</span></div>
+      <div class="dash-card-body no-pad">
         <table class="data-table">
-          <thead><tr><th>Name</th><th>Type</th><th>Brand</th><th>Price ($)</th><th>Date</th><th>Condition</th><th>Field</th><th>Notes</th><th>Actions</th></tr></thead>
-          <tbody id="equipTableBody"><tr><td colspan="9" class="empty-row">No equipment added yet.</td></tr></tbody>
+          <thead><tr><th>Name</th><th>Type</th><th>Brand</th><th>Price</th><th>Date</th><th>Condition</th><th>Field</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody id="equipTableBody"><tr><td colspan="9" class="empty-row"><i class="fa fa-tractor"></i> No equipment added yet.</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -233,19 +357,19 @@
       <button class="btn btn-primary" id="addHarvestBtn"><i class="fa fa-plus"></i> Log Harvest</button>
     </div>
     <div class="stats-grid mini">
-      <div class="stat-card green"><div class="stat-icon"><i class="fa fa-wheat-awn"></i></div><div class="stat-info"><p class="stat-label">Wheat/Barley/Oat</p><h2 class="stat-value" id="harvestGrain">0 L</h2></div></div>
-      <div class="stat-card yellow"><div class="stat-icon"><i class="fa fa-sun"></i></div><div class="stat-info"><p class="stat-label">Canola/Sunflower</p><h2 class="stat-value" id="harvestCanola">0 L</h2></div></div>
-      <div class="stat-card orange"><div class="stat-icon"><i class="fa fa-leaf"></i></div><div class="stat-info"><p class="stat-label">Corn/Soybeans</p><h2 class="stat-value" id="harvestCorn">0 L</h2></div></div>
-      <div class="stat-card teal"><div class="stat-icon"><i class="fa fa-spa"></i></div><div class="stat-info"><p class="stat-label">Grass / Hay</p><h2 class="stat-value" id="harvestGrass">0 L</h2></div></div>
-      <div class="stat-card blue"><div class="stat-icon"><i class="fa fa-carrot"></i></div><div class="stat-info"><p class="stat-label">Root Crops</p><h2 class="stat-value" id="harvestRoot">0 L</h2></div></div>
-      <div class="stat-card purple"><div class="stat-icon"><i class="fa fa-star"></i></div><div class="stat-info"><p class="stat-label">Other</p><h2 class="stat-value" id="harvestOther">0 L</h2></div></div>
+      <div class="mini-stat green"><i class="fa fa-wheat-awn"></i><div><p>Grain</p><strong id="harvestGrain">0 L</strong></div></div>
+      <div class="mini-stat yellow"><i class="fa fa-sun"></i><div><p>Canola/Sunflower</p><strong id="harvestCanola">0 L</strong></div></div>
+      <div class="mini-stat orange"><i class="fa fa-leaf"></i><div><p>Corn/Soybeans</p><strong id="harvestCorn">0 L</strong></div></div>
+      <div class="mini-stat teal"><i class="fa fa-spa"></i><div><p>Grass / Hay</p><strong id="harvestGrass">0 L</strong></div></div>
+      <div class="mini-stat blue"><i class="fa fa-carrot"></i><div><p>Root Crops</p><strong id="harvestRoot">0 L</strong></div></div>
+      <div class="mini-stat purple"><i class="fa fa-star"></i><div><p>Other</p><strong id="harvestOther">0 L</strong></div></div>
     </div>
-    <div class="card">
-      <div class="card-header"><i class="fa fa-history"></i> Harvest Log</div>
-      <div class="card-body">
+    <div class="dash-card">
+      <div class="dash-card-header"><span><i class="fa fa-list"></i> Harvest Log</span></div>
+      <div class="dash-card-body no-pad">
         <table class="data-table">
           <thead><tr><th>Date</th><th>Field</th><th>Crop</th><th>Amount (L)</th><th>Quality</th><th>Sold?</th><th>Notes</th><th>Actions</th></tr></thead>
-          <tbody id="harvestTableBody"><tr><td colspan="8" class="empty-row">No harvests logged yet.</td></tr></tbody>
+          <tbody id="harvestTableBody"><tr><td colspan="8" class="empty-row"><i class="fa fa-wheat-awn"></i> No harvests logged yet.</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -256,16 +380,16 @@
     <div class="page-actions">
       <button class="btn btn-primary" id="addSaleBtn"><i class="fa fa-plus"></i> Log Sale</button>
     </div>
-    <div class="stats-grid mini">
-      <div class="stat-card green"><div class="stat-icon"><i class="fa fa-coins"></i></div><div class="stat-info"><p class="stat-label">Total Revenue</p><h2 class="stat-value" id="totalSalesRevenue">$0</h2></div></div>
-      <div class="stat-card blue"><div class="stat-icon"><i class="fa fa-list"></i></div><div class="stat-info"><p class="stat-label">Transactions</p><h2 class="stat-value" id="totalSalesCount">0</h2></div></div>
+    <div class="stats-grid mini" style="grid-template-columns:repeat(2,1fr);max-width:500px">
+      <div class="mini-stat green"><i class="fa fa-coins"></i><div><p>Total Revenue</p><strong id="totalSalesRevenue">$0</strong></div></div>
+      <div class="mini-stat blue"><i class="fa fa-list"></i><div><p>Transactions</p><strong id="totalSalesCount">0</strong></div></div>
     </div>
-    <div class="card">
-      <div class="card-header"><i class="fa fa-dollar-sign"></i> Sales Log</div>
-      <div class="card-body">
+    <div class="dash-card">
+      <div class="dash-card-header"><span><i class="fa fa-dollar-sign"></i> Sales Log</span></div>
+      <div class="dash-card-body no-pad">
         <table class="data-table">
-          <thead><tr><th>Date</th><th>Item / Crop</th><th>Category</th><th>Amount</th><th>$/Unit</th><th>Total ($)</th><th>Buyer</th><th>Notes</th><th>Actions</th></tr></thead>
-          <tbody id="salesTableBody"><tr><td colspan="9" class="empty-row">No sales logged yet.</td></tr></tbody>
+          <thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Amount</th><th>$/Unit</th><th>Total</th><th>Buyer</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody id="salesTableBody"><tr><td colspan="9" class="empty-row"><i class="fa fa-dollar-sign"></i> No sales logged yet.</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -276,16 +400,16 @@
     <div class="page-actions">
       <button class="btn btn-primary" id="addPurchaseBtn"><i class="fa fa-plus"></i> Log Purchase</button>
     </div>
-    <div class="stats-grid mini">
-      <div class="stat-card red"><div class="stat-icon"><i class="fa fa-shopping-cart"></i></div><div class="stat-info"><p class="stat-label">Total Spent</p><h2 class="stat-value" id="totalPurchasesSpent">$0</h2></div></div>
-      <div class="stat-card blue"><div class="stat-icon"><i class="fa fa-list"></i></div><div class="stat-info"><p class="stat-label">Purchases</p><h2 class="stat-value" id="totalPurchasesCount">0</h2></div></div>
+    <div class="stats-grid mini" style="grid-template-columns:repeat(2,1fr);max-width:500px">
+      <div class="mini-stat red"><i class="fa fa-shopping-cart"></i><div><p>Total Spent</p><strong id="totalPurchasesSpent">$0</strong></div></div>
+      <div class="mini-stat blue"><i class="fa fa-list"></i><div><p>Purchases</p><strong id="totalPurchasesCount">0</strong></div></div>
     </div>
-    <div class="card">
-      <div class="card-header"><i class="fa fa-shopping-cart"></i> Purchases Log</div>
-      <div class="card-body">
+    <div class="dash-card">
+      <div class="dash-card-header"><span><i class="fa fa-shopping-cart"></i> Purchases Log</span></div>
+      <div class="dash-card-body no-pad">
         <table class="data-table">
-          <thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Qty</th><th>Unit Cost</th><th>Total ($)</th><th>Store</th><th>Notes</th><th>Actions</th></tr></thead>
-          <tbody id="purchaseTableBody"><tr><td colspan="9" class="empty-row">No purchases logged yet.</td></tr></tbody>
+          <thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Store</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody id="purchaseTableBody"><tr><td colspan="9" class="empty-row"><i class="fa fa-shopping-cart"></i> No purchases logged yet.</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -293,37 +417,35 @@
 
   <!-- ===== FINANCES ===== -->
   <section class="page" id="page-finance">
-    <div class="stats-grid">
-      <div class="stat-card green"><div class="stat-icon"><i class="fa fa-arrow-up"></i></div><div class="stat-info"><p class="stat-label">Total Income</p><h2 class="stat-value" id="finTotalIncome">$0</h2></div></div>
-      <div class="stat-card red"><div class="stat-icon"><i class="fa fa-arrow-down"></i></div><div class="stat-info"><p class="stat-label">Total Expenses</p><h2 class="stat-value" id="finTotalExpenses">$0</h2></div></div>
-      <div class="stat-card blue"><div class="stat-icon"><i class="fa fa-balance-scale"></i></div><div class="stat-info"><p class="stat-label">Net Profit</p><h2 class="stat-value" id="finNetProfit">$0</h2></div></div>
+    <div class="stats-grid mini" style="grid-template-columns:repeat(3,1fr);max-width:700px">
+      <div class="mini-stat green"><i class="fa fa-arrow-up"></i><div><p>Total Income</p><strong id="finTotalIncome">$0</strong></div></div>
+      <div class="mini-stat red"><i class="fa fa-arrow-down"></i><div><p>Total Expenses</p><strong id="finTotalExpenses">$0</strong></div></div>
+      <div class="mini-stat blue"><i class="fa fa-scale-balanced"></i><div><p>Net Profit</p><strong id="finNetProfit">$0</strong></div></div>
     </div>
     <div class="dashboard-grid">
-      <div class="card full-width">
-        <div class="card-header"><i class="fa fa-chart-pie"></i> Expense Breakdown</div>
-        <div class="card-body" style="max-width:500px;margin:0 auto;"><canvas id="expenseChart" height="120"></canvas></div>
+      <div class="dash-card">
+        <div class="dash-card-header"><span><i class="fa fa-chart-pie"></i> Expense Breakdown</span></div>
+        <div class="dash-card-body" style="max-width:400px;margin:0 auto"><canvas id="expenseChart" height="140"></canvas></div>
       </div>
-      <div class="card full-width">
-        <div class="card-header"><i class="fa fa-plus-circle"></i> Add Manual Finance Entry</div>
-        <div class="card-body">
+      <div class="dash-card">
+        <div class="dash-card-header"><span><i class="fa fa-plus"></i> Add Finance Entry</span></div>
+        <div class="dash-card-body">
           <form id="financeForm" class="form-grid">
             <div class="form-group"><label>Date</label><input type="date" id="finDate" required /></div>
-            <div class="form-group"><label>Type</label>
-              <select id="finType"><option value="income">Income</option><option value="expense">Expense</option></select>
-            </div>
+            <div class="form-group"><label>Type</label><select id="finType"><option value="income">Income</option><option value="expense">Expense</option></select></div>
             <div class="form-group"><label>Category</label>
-              <select id="finCategory">
-                <option>Crop Sale</option><option>Equipment Sale</option><option>Animal Sale</option>
-                <option>Contract</option><option>Equipment Purchase</option><option>Seeds</option>
-                <option>Fertilizer</option><option>Fuel</option><option>Field Purchase</option>
-                <option>Hired Help</option><option>Maintenance</option><option>Other</option>
-              </select>
+              <select id="finCategory"><option>Crop Sale</option><option>Equipment Sale</option><option>Animal Sale</option><option>Contract</option><option>Equipment Purchase</option><option>Seeds</option><option>Fertilizer</option><option>Fuel</option><option>Field Purchase</option><option>Hired Help</option><option>Maintenance</option><option>Other</option></select>
             </div>
-            <div class="form-group"><label>Amount ($)</label><input type="number" id="finAmount" min="0" step="0.01" required /></div>
-            <div class="form-group full-span"><label>Description</label><input type="text" id="finDesc" placeholder="Optional description..." /></div>
+            <div class="form-group"><label>Amount ($)</label><div class="input-prefix-wrap"><span class="input-prefix">$</span><input type="number" id="finAmount" min="0" step="0.01" required /></div></div>
+            <div class="form-group full-span"><label>Description</label><input type="text" id="finDesc" placeholder="Optional..." /></div>
             <div class="form-group full-span"><button type="submit" class="btn btn-primary"><i class="fa fa-plus"></i> Add Entry</button></div>
           </form>
-          <table class="data-table" style="margin-top:1.5rem;">
+        </div>
+      </div>
+      <div class="dash-card span-2">
+        <div class="dash-card-header"><span><i class="fa fa-table"></i> Finance Entries</span></div>
+        <div class="dash-card-body no-pad">
+          <table class="data-table">
             <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Amount</th><th>Description</th><th>Actions</th></tr></thead>
             <tbody id="financeTableBody"><tr><td colspan="6" class="empty-row">No entries yet.</td></tr></tbody>
           </table>
@@ -337,44 +459,35 @@
     <div class="page-actions">
       <button class="btn btn-primary" id="addAnimalBtn"><i class="fa fa-plus"></i> Add Animal</button>
     </div>
-    <div class="card">
-      <div class="card-header"><i class="fa fa-horse"></i> Animal Inventory</div>
-      <div class="card-body">
+    <div class="dash-card">
+      <div class="dash-card-header"><span><i class="fa fa-horse"></i> Animal Inventory</span><span class="dash-card-badge" id="animalCount">0</span></div>
+      <div class="dash-card-body no-pad">
         <table class="data-table">
-          <thead><tr><th>Type</th><th>Name / ID</th><th>Count</th><th>Pen</th><th>Feed Status</th><th>Production</th><th>Value ($)</th><th>Notes</th><th>Actions</th></tr></thead>
-          <tbody id="animalTableBody"><tr><td colspan="9" class="empty-row">No animals added yet.</td></tr></tbody>
+          <thead><tr><th>Type</th><th>Name / ID</th><th>Count</th><th>Pen</th><th>Feed</th><th>Production</th><th>Value</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody id="animalTableBody"><tr><td colspan="9" class="empty-row"><i class="fa fa-horse"></i> No animals added yet.</td></tr></tbody>
         </table>
       </div>
     </div>
   </section>
 
-</div><!-- end main-content -->
+</div>
 
 <!-- ===== MODALS ===== -->
 
 <!-- Field Modal -->
 <div class="modal-overlay" id="fieldModal">
   <div class="modal">
-    <div class="modal-header"><h3 id="fieldModalTitle">Add Field</h3><button class="modal-close" data-modal="fieldModal"><i class="fa fa-times"></i></button></div>
+    <div class="modal-header"><h3 id="fieldModalTitle"><i class="fa fa-seedling"></i> Add Field</h3><button class="modal-close" data-modal="fieldModal"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
       <form id="fieldForm" class="form-grid">
         <input type="hidden" id="fieldId" />
         <div class="form-group"><label>Field Name</label><input type="text" id="fieldName" placeholder="e.g. North Pasture" required /></div>
         <div class="form-group"><label>Hectares</label><input type="number" id="fieldHa" step="0.01" min="0" required /></div>
         <div class="form-group"><label>Current Crop</label>
-          <select id="fieldCrop">
-            <option value="None">None / Fallow</option>
-            <option>Wheat</option><option>Barley</option><option>Oat</option><option>Canola</option>
-            <option>Corn</option><option>Sunflower</option><option>Soybeans</option><option>Potatoes</option>
-            <option>Sugar Beet</option><option>Cotton</option><option>Grass</option><option>Hay</option>
-            <option>Silage</option><option>Other</option>
-          </select>
+          <select id="fieldCrop"><option value="None">None / Fallow</option><option>Wheat</option><option>Barley</option><option>Oat</option><option>Canola</option><option>Corn</option><option>Sunflower</option><option>Soybeans</option><option>Potatoes</option><option>Sugar Beet</option><option>Cotton</option><option>Grass</option><option>Hay</option><option>Silage</option><option>Other</option></select>
         </div>
         <div class="form-group"><label>Status</label>
-          <select id="fieldStatus">
-            <option>Plowed</option><option>Cultivated</option><option>Seeded</option><option>Fertilized</option>
-            <option>Growing</option><option>Ready to Harvest</option><option>Harvested</option><option>Fallow</option>
-          </select>
+          <select id="fieldStatus"><option>Plowed</option><option>Cultivated</option><option>Seeded</option><option>Fertilized</option><option>Growing</option><option>Ready to Harvest</option><option>Harvested</option><option>Fallow</option></select>
         </div>
         <div class="form-group"><label>Soil Quality</label>
           <select id="fieldSoil"><option>Poor</option><option>Average</option><option>Good</option><option>Excellent</option></select>
@@ -383,10 +496,7 @@
           <select id="fieldHired"><option value="No">No</option><option value="Yes">Yes</option></select>
         </div>
         <div class="form-group full-span"><label>Notes</label><textarea id="fieldNotes" rows="2"></textarea></div>
-        <div class="form-group full-span modal-actions">
-          <button type="button" class="btn btn-outline" data-modal="fieldModal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Field</button>
-        </div>
+        <div class="form-group full-span modal-actions"><button type="button" class="btn btn-outline" data-modal="fieldModal">Cancel</button><button type="submit" class="btn btn-primary">Save Field</button></div>
       </form>
     </div>
   </div>
@@ -395,32 +505,23 @@
 <!-- Equipment Modal -->
 <div class="modal-overlay" id="equipModal">
   <div class="modal">
-    <div class="modal-header"><h3 id="equipModalTitle">Add Equipment</h3><button class="modal-close" data-modal="equipModal"><i class="fa fa-times"></i></button></div>
+    <div class="modal-header"><h3 id="equipModalTitle"><i class="fa fa-tractor"></i> Add Equipment</h3><button class="modal-close" data-modal="equipModal"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
       <form id="equipForm" class="form-grid">
         <input type="hidden" id="equipId" />
-        <div class="form-group"><label>Equipment Name</label><input type="text" id="equipName" placeholder="e.g. John Deere 8R 410" required /></div>
+        <div class="form-group"><label>Name</label><input type="text" id="equipName" placeholder="e.g. John Deere 8R 410" required /></div>
         <div class="form-group"><label>Type</label>
-          <select id="equipType">
-            <option>Tractor</option><option>Harvester / Combine</option><option>Seeder / Planter</option>
-            <option>Plow</option><option>Cultivator</option><option>Fertilizer Spreader</option>
-            <option>Sprayer</option><option>Trailer / Wagon</option><option>Front Loader</option>
-            <option>Baler</option><option>Mower</option><option>Tedder</option><option>Rake</option>
-            <option>Forage Harvester</option><option>Truck</option><option>Other</option>
-          </select>
+          <select id="equipType"><option>Tractor</option><option>Harvester / Combine</option><option>Seeder / Planter</option><option>Plow</option><option>Cultivator</option><option>Fertilizer Spreader</option><option>Sprayer</option><option>Trailer / Wagon</option><option>Front Loader</option><option>Baler</option><option>Mower</option><option>Tedder</option><option>Rake</option><option>Forage Harvester</option><option>Truck</option><option>Other</option></select>
         </div>
-        <div class="form-group"><label>Brand</label><input type="text" id="equipBrand" placeholder="e.g. Fendt, Claas, Case IH..." /></div>
-        <div class="form-group"><label>Purchase Price ($)</label><input type="number" id="equipPrice" step="0.01" min="0" /></div>
-        <div class="form-group"><label>Purchase Date</label><input type="date" id="equipDate" /></div>
+        <div class="form-group"><label>Brand</label><input type="text" id="equipBrand" placeholder="e.g. Fendt, Claas..." /></div>
+        <div class="form-group"><label>Price ($)</label><input type="number" id="equipPrice" step="0.01" min="0" /></div>
+        <div class="form-group"><label>Date</label><input type="date" id="equipDate" /></div>
         <div class="form-group"><label>Condition</label>
           <select id="equipCondition"><option>New</option><option>Good</option><option>Fair</option><option>Needs Repair</option></select>
         </div>
-        <div class="form-group"><label>Assigned Field</label><input type="text" id="equipField" placeholder="Field name or 'Unassigned'" /></div>
+        <div class="form-group"><label>Assigned Field</label><input type="text" id="equipField" placeholder="Field or 'Unassigned'" /></div>
         <div class="form-group full-span"><label>Notes</label><textarea id="equipNotes" rows="2"></textarea></div>
-        <div class="form-group full-span modal-actions">
-          <button type="button" class="btn btn-outline" data-modal="equipModal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Equipment</button>
-        </div>
+        <div class="form-group full-span modal-actions"><button type="button" class="btn btn-outline" data-modal="equipModal">Cancel</button><button type="submit" class="btn btn-primary">Save Equipment</button></div>
       </form>
     </div>
   </div>
@@ -429,21 +530,16 @@
 <!-- Harvest Modal -->
 <div class="modal-overlay" id="harvestModal">
   <div class="modal">
-    <div class="modal-header"><h3 id="harvestModalTitle">Log Harvest</h3><button class="modal-close" data-modal="harvestModal"><i class="fa fa-times"></i></button></div>
+    <div class="modal-header"><h3 id="harvestModalTitle"><i class="fa fa-wheat-awn"></i> Log Harvest</h3><button class="modal-close" data-modal="harvestModal"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
       <form id="harvestForm" class="form-grid">
         <input type="hidden" id="harvestId" />
         <div class="form-group"><label>Date</label><input type="date" id="harvestDate" required /></div>
         <div class="form-group"><label>Field</label><input type="text" id="harvestField" placeholder="Field name" required /></div>
         <div class="form-group"><label>Crop</label>
-          <select id="harvestCrop">
-            <option>Wheat</option><option>Barley</option><option>Oat</option><option>Canola</option>
-            <option>Corn</option><option>Sunflower</option><option>Soybeans</option><option>Potatoes</option>
-            <option>Sugar Beet</option><option>Cotton</option><option>Grass</option><option>Hay</option>
-            <option>Silage</option><option>Other</option>
-          </select>
+          <select id="harvestCrop"><option>Wheat</option><option>Barley</option><option>Oat</option><option>Canola</option><option>Corn</option><option>Sunflower</option><option>Soybeans</option><option>Potatoes</option><option>Sugar Beet</option><option>Cotton</option><option>Grass</option><option>Hay</option><option>Silage</option><option>Other</option></select>
         </div>
-        <div class="form-group"><label>Amount (Liters)</label><input type="number" id="harvestAmount" step="1" min="0" required /></div>
+        <div class="form-group"><label>Amount (L)</label><input type="number" id="harvestAmount" step="1" min="0" required /></div>
         <div class="form-group"><label>Quality</label>
           <select id="harvestQuality"><option>Low</option><option>Average</option><option>Good</option><option>Excellent</option></select>
         </div>
@@ -451,10 +547,7 @@
           <select id="harvestSold"><option value="No">No</option><option value="Yes">Yes</option></select>
         </div>
         <div class="form-group full-span"><label>Notes</label><textarea id="harvestNotes" rows="2"></textarea></div>
-        <div class="form-group full-span modal-actions">
-          <button type="button" class="btn btn-outline" data-modal="harvestModal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Harvest</button>
-        </div>
+        <div class="form-group full-span modal-actions"><button type="button" class="btn btn-outline" data-modal="harvestModal">Cancel</button><button type="submit" class="btn btn-primary">Save Harvest</button></div>
       </form>
     </div>
   </div>
@@ -463,30 +556,22 @@
 <!-- Sale Modal -->
 <div class="modal-overlay" id="saleModal">
   <div class="modal">
-    <div class="modal-header"><h3 id="saleModalTitle">Log Sale</h3><button class="modal-close" data-modal="saleModal"><i class="fa fa-times"></i></button></div>
+    <div class="modal-header"><h3 id="saleModalTitle"><i class="fa fa-dollar-sign"></i> Log Sale</h3><button class="modal-close" data-modal="saleModal"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
       <form id="saleForm" class="form-grid">
         <input type="hidden" id="saleId" />
         <div class="form-group"><label>Date</label><input type="date" id="saleDate" required /></div>
-        <div class="form-group"><label>Item / Crop</label><input type="text" id="saleItem" placeholder="e.g. Wheat, Hay Bale, Old Tractor..." required /></div>
+        <div class="form-group"><label>Item / Crop</label><input type="text" id="saleItem" placeholder="e.g. Wheat, Hay Bale..." required /></div>
         <div class="form-group"><label>Category</label>
-          <select id="saleCat">
-            <option>Grain</option><option>Hay</option><option>Grass / Silage</option><option>Vegetables / Root Crops</option>
-            <option>Equipment</option><option>Animal</option><option>Contract</option><option>Other</option>
-          </select>
+          <select id="saleCat"><option>Grain</option><option>Hay</option><option>Grass / Silage</option><option>Vegetables / Root Crops</option><option>Equipment</option><option>Animal</option><option>Contract</option><option>Other</option></select>
         </div>
         <div class="form-group"><label>Amount (L / Units)</label><input type="number" id="saleAmt" step="1" min="0" /></div>
         <div class="form-group"><label>Price per Unit ($)</label><input type="number" id="salePPU" step="0.01" min="0" /></div>
         <div class="form-group"><label>Total ($)</label><input type="number" id="saleTotal" step="0.01" min="0" required /></div>
-        <div class="form-group"><label>Buyer / Location</label><input type="text" id="saleBuyer" placeholder="e.g. Grain Mill, Farm Store..." /></div>
+        <div class="form-group"><label>Buyer / Location</label><input type="text" id="saleBuyer" placeholder="e.g. Grain Mill..." /></div>
         <div class="form-group full-span"><label>Notes</label><textarea id="saleNotes" rows="2"></textarea></div>
-        <div class="form-group full-span">
-          <div class="sale-wallet-notice"><i class="fa fa-info-circle"></i> This sale total will be <strong>added to your balance</strong> automatically.</div>
-        </div>
-        <div class="form-group full-span modal-actions">
-          <button type="button" class="btn btn-outline" data-modal="saleModal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Sale</button>
-        </div>
+        <div class="form-group full-span"><div class="notice-bar green"><i class="fa fa-circle-info"></i> Sale total will be <strong>added to your balance</strong> automatically.</div></div>
+        <div class="form-group full-span modal-actions"><button type="button" class="btn btn-outline" data-modal="saleModal">Cancel</button><button type="submit" class="btn btn-primary">Save Sale</button></div>
       </form>
     </div>
   </div>
@@ -495,31 +580,22 @@
 <!-- Purchase Modal -->
 <div class="modal-overlay" id="purchaseModal">
   <div class="modal">
-    <div class="modal-header"><h3 id="purchaseModalTitle">Log Purchase</h3><button class="modal-close" data-modal="purchaseModal"><i class="fa fa-times"></i></button></div>
+    <div class="modal-header"><h3 id="purchaseModalTitle"><i class="fa fa-shopping-cart"></i> Log Purchase</h3><button class="modal-close" data-modal="purchaseModal"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
       <form id="purchaseForm" class="form-grid">
         <input type="hidden" id="purchaseId" />
         <div class="form-group"><label>Date</label><input type="date" id="purchaseDate" required /></div>
-        <div class="form-group"><label>Item</label><input type="text" id="purchaseItem" placeholder="e.g. Wheat Seeds, Fertilizer, Tractor..." required /></div>
+        <div class="form-group"><label>Item</label><input type="text" id="purchaseItem" placeholder="e.g. Wheat Seeds..." required /></div>
         <div class="form-group"><label>Category</label>
-          <select id="purchaseCat">
-            <option>Equipment</option><option>Seeds</option><option>Fertilizer</option><option>Herbicide</option>
-            <option>Fuel</option><option>Field</option><option>Animal Feed</option><option>Hired Help</option>
-            <option>Maintenance</option><option>Other</option>
-          </select>
+          <select id="purchaseCat"><option>Equipment</option><option>Seeds</option><option>Fertilizer</option><option>Herbicide</option><option>Fuel</option><option>Field</option><option>Animal Feed</option><option>Hired Help</option><option>Maintenance</option><option>Other</option></select>
         </div>
         <div class="form-group"><label>Quantity</label><input type="number" id="purchaseQty" step="1" min="1" value="1" /></div>
         <div class="form-group"><label>Unit Cost ($)</label><input type="number" id="purchaseUC" step="0.01" min="0" /></div>
         <div class="form-group"><label>Total ($)</label><input type="number" id="purchaseTotal" step="0.01" min="0" required /></div>
-        <div class="form-group"><label>Store / Seller</label><input type="text" id="purchaseSeller" placeholder="e.g. Farm Store, Dealer..." /></div>
+        <div class="form-group"><label>Store / Seller</label><input type="text" id="purchaseSeller" placeholder="e.g. Farm Store..." /></div>
         <div class="form-group full-span"><label>Notes</label><textarea id="purchaseNotes" rows="2"></textarea></div>
-        <div class="form-group full-span">
-          <div class="sale-wallet-notice warning"><i class="fa fa-info-circle"></i> This purchase total will be <strong>deducted from your balance</strong> automatically.</div>
-        </div>
-        <div class="form-group full-span modal-actions">
-          <button type="button" class="btn btn-outline" data-modal="purchaseModal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Purchase</button>
-        </div>
+        <div class="form-group full-span"><div class="notice-bar red"><i class="fa fa-circle-info"></i> Purchase total will be <strong>deducted from your balance</strong> automatically.</div></div>
+        <div class="form-group full-span modal-actions"><button type="button" class="btn btn-outline" data-modal="purchaseModal">Cancel</button><button type="submit" class="btn btn-primary">Save Purchase</button></div>
       </form>
     </div>
   </div>
@@ -528,29 +604,19 @@
 <!-- Animal Modal -->
 <div class="modal-overlay" id="animalModal">
   <div class="modal">
-    <div class="modal-header"><h3 id="animalModalTitle">Add Animal</h3><button class="modal-close" data-modal="animalModal"><i class="fa fa-times"></i></button></div>
+    <div class="modal-header"><h3 id="animalModalTitle"><i class="fa fa-horse"></i> Add Animal</h3><button class="modal-close" data-modal="animalModal"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
       <form id="animalForm" class="form-grid">
         <input type="hidden" id="animalId" />
-        <div class="form-group"><label>Type</label>
-          <select id="animalType">
-            <option>Cow</option><option>Sheep</option><option>Pig</option><option>Chicken</option>
-            <option>Horse</option><option>Goat</option><option>Other</option>
-          </select>
-        </div>
-        <div class="form-group"><label>Name / ID</label><input type="text" id="animalName" placeholder="e.g. Bessie, Cow #3..." required /></div>
+        <div class="form-group"><label>Type</label><select id="animalType"><option>Cow</option><option>Sheep</option><option>Pig</option><option>Chicken</option><option>Horse</option><option>Goat</option><option>Other</option></select></div>
+        <div class="form-group"><label>Name / ID</label><input type="text" id="animalName" placeholder="e.g. Bessie, Cow #3" required /></div>
         <div class="form-group"><label>Count</label><input type="number" id="animalCount" min="1" value="1" /></div>
-        <div class="form-group"><label>Pen / Location</label><input type="text" id="animalPen" placeholder="e.g. Barn A, Pasture 2" /></div>
-        <div class="form-group"><label>Feed Status</label>
-          <select id="animalFeed"><option>Full</option><option>Half</option><option>Low</option><option>Empty</option></select>
-        </div>
-        <div class="form-group"><label>Production</label><input type="text" id="animalProd" placeholder="e.g. 25L milk/day, 2kg wool/season" /></div>
+        <div class="form-group"><label>Pen / Location</label><input type="text" id="animalPen" placeholder="e.g. Barn A" /></div>
+        <div class="form-group"><label>Feed Status</label><select id="animalFeed"><option>Full</option><option>Half</option><option>Low</option><option>Empty</option></select></div>
+        <div class="form-group"><label>Production</label><input type="text" id="animalProd" placeholder="e.g. 25L milk/day" /></div>
         <div class="form-group"><label>Value ($)</label><input type="number" id="animalValue" step="0.01" min="0" /></div>
         <div class="form-group full-span"><label>Notes</label><textarea id="animalNotes" rows="2"></textarea></div>
-        <div class="form-group full-span modal-actions">
-          <button type="button" class="btn btn-outline" data-modal="animalModal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Animal</button>
-        </div>
+        <div class="form-group full-span modal-actions"><button type="button" class="btn btn-outline" data-modal="animalModal">Cancel</button><button type="submit" class="btn btn-primary">Save Animal</button></div>
       </form>
     </div>
   </div>
@@ -559,61 +625,49 @@
 <!-- Farm Name Modal -->
 <div class="modal-overlay" id="farmNameModal">
   <div class="modal" style="max-width:400px">
-    <div class="modal-header"><h3>Edit Farm Info</h3><button class="modal-close" data-modal="farmNameModal"><i class="fa fa-times"></i></button></div>
+    <div class="modal-header"><h3><i class="fa fa-pen"></i> Edit Farm Info</h3><button class="modal-close" data-modal="farmNameModal"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
       <form id="farmNameForm" class="form-grid">
         <div class="form-group full-span"><label>Farm Name</label><input type="text" id="farmNameInput" placeholder="My Farm" /></div>
-        <div class="form-group"><label>Season</label>
-          <select id="seasonSelect"><option>Spring</option><option>Summer</option><option>Autumn</option><option>Winter</option></select>
-        </div>
+        <div class="form-group"><label>Season</label><select id="seasonSelect"><option>Spring</option><option>Summer</option><option>Autumn</option><option>Winter</option></select></div>
         <div class="form-group"><label>Year</label><input type="number" id="yearInput" min="1" value="1" /></div>
-        <div class="form-group full-span modal-actions">
-          <button type="button" class="btn btn-outline" data-modal="farmNameModal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save</button>
-        </div>
+        <div class="form-group full-span modal-actions"><button type="button" class="btn btn-outline" data-modal="farmNameModal">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div>
       </form>
     </div>
   </div>
 </div>
 
-<!-- Confirm Delete Modal (generic) -->
+<!-- Confirm Delete Modal -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal" style="max-width:380px">
     <div class="modal-header"><h3>⚠️ Confirm Delete</h3><button class="modal-close" data-modal="confirmModal"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
-      <p style="margin-bottom:1.5rem;color:var(--text-secondary);">Are you sure you want to delete this record? This action cannot be undone.</p>
-      <div class="modal-actions">
-        <button class="btn btn-outline" data-modal="confirmModal">Cancel</button>
-        <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
-      </div>
+      <p style="margin-bottom:1.5rem;color:var(--text-secondary)">Are you sure you want to delete this record? This cannot be undone.</p>
+      <div class="modal-actions"><button class="btn btn-outline" data-modal="confirmModal">Cancel</button><button class="btn btn-danger" id="confirmDeleteBtn">Delete</button></div>
     </div>
   </div>
 </div>
 
-<!-- ===== RESET CONFIRMATION MODAL ===== -->
+<!-- Reset Modal -->
 <div class="modal-overlay" id="resetModal">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-header">
-      <h3>🔴 Reset All Data</h3>
-      <button class="modal-close" data-modal="resetModal"><i class="fa fa-times"></i></button>
-    </div>
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header"><h3>🔴 Reset All Data</h3><button class="modal-close" data-modal="resetModal"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
       <div class="reset-warning-box">
         <i class="fa fa-triangle-exclamation"></i>
         <div>
-          <strong>This will permanently delete EVERYTHING:</strong>
-          <ul style="margin-top:0.5rem;padding-left:1.2rem;color:var(--text-secondary);font-size:0.85rem;line-height:1.8">
-            <li>All fields, equipment, harvests</li>
-            <li>All sales, purchases, finances</li>
-            <li>All animals and activity log</li>
-            <li>Your entire wallet &amp; balance history</li>
-            <li>Farm name, season, and year</li>
+          <strong>This permanently deletes EVERYTHING:</strong>
+          <ul style="margin-top:0.5rem;padding-left:1.2rem;color:var(--text-secondary);font-size:0.85rem;line-height:1.9">
+            <li>Fields, equipment, harvests, animals</li>
+            <li>All sales, purchases &amp; finances</li>
+            <li>Entire wallet &amp; balance history</li>
+            <li>Farm name, season &amp; year</li>
           </ul>
         </div>
       </div>
-      <p style="margin:1rem 0 0.5rem;font-size:0.88rem;color:var(--text-secondary);">Type <strong style="color:var(--accent-red)">RESET</strong> below to confirm:</p>
+      <p style="margin:1rem 0 0.4rem;font-size:0.88rem;color:var(--text-secondary)">Type <strong style="color:var(--accent-red)">RESET</strong> to confirm:</p>
       <input type="text" id="resetConfirmInput" placeholder="Type RESET to confirm" autocomplete="off" />
-      <div class="modal-actions" style="margin-top:1rem;">
+      <div class="modal-actions" style="margin-top:1rem">
         <button class="btn btn-outline" data-modal="resetModal">Cancel</button>
         <button class="btn btn-danger" id="confirmResetBtn"><i class="fa fa-rotate-left"></i> Reset Everything</button>
       </div>
@@ -622,7 +676,7 @@
 </div>
 
 <!-- Toast -->
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast"><span id="toastMsg"></span></div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="app.js"></script>
