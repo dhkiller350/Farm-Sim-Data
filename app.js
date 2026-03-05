@@ -1,5 +1,6 @@
 // =====================================================
-//  FARM SIM 25 MANAGER — app.js
+//  FARM SIM 25 MANAGER — app.js  v1.2
+//  + Reset button with typed confirmation
 // =====================================================
 
 // ---------- STATE ----------
@@ -7,6 +8,8 @@ let state = {
   farmName: 'My Farm',
   season: 'Spring',
   year: 1,
+  startingBalance: 0,
+  walletTransactions: [],
   fields: [],
   equipment: [],
   harvests: [],
@@ -16,6 +19,22 @@ let state = {
   animals: [],
   activity: [],
 };
+
+const DEFAULT_STATE = () => ({
+  farmName: 'My Farm',
+  season: 'Spring',
+  year: 1,
+  startingBalance: 0,
+  walletTransactions: [],
+  fields: [],
+  equipment: [],
+  harvests: [],
+  sales: [],
+  purchases: [],
+  finances: [],
+  animals: [],
+  activity: [],
+});
 
 let pendingDeleteFn = null;
 let financeChartInstance = null;
@@ -28,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSidebar();
   setupModals();
   setupForms();
+  setupReset();
   renderAll();
   setTodayDates();
 });
@@ -40,10 +60,8 @@ function saveState() {
 function loadState() {
   const raw = localStorage.getItem('fs25_state');
   if (raw) {
-    try {
-      const loaded = JSON.parse(raw);
-      state = Object.assign(state, loaded);
-    } catch(e) {}
+    try { state = Object.assign(DEFAULT_STATE(), JSON.parse(raw)); }
+    catch(e) { state = DEFAULT_STATE(); }
   }
 }
 
@@ -55,40 +73,153 @@ function setTodayDates() {
   });
 }
 
+// ---------- RESET ----------
+function setupReset() {
+  // Open modal on reset button click
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    document.getElementById('resetConfirmInput').value = '';
+    openModal('resetModal');
+  });
+
+  // Confirm reset only if user typed "RESET"
+  document.getElementById('confirmResetBtn').addEventListener('click', () => {
+    const val = document.getElementById('resetConfirmInput').value.trim();
+    if (val !== 'RESET') {
+      // Shake the input to signal wrong input
+      const inp = document.getElementById('resetConfirmInput');
+      inp.style.borderColor = 'var(--accent-red)';
+      inp.style.animation = 'shake 0.4s ease';
+      inp.addEventListener('animationend', () => { inp.style.animation = ''; }, { once: true });
+      showToast('⚠️ Type RESET (all caps) to confirm.', 'error');
+      return;
+    }
+    // Perform reset
+    state = DEFAULT_STATE();
+    localStorage.removeItem('fs25_state');
+    // Destroy charts so they redraw clean
+    if (financeChartInstance) { financeChartInstance.destroy(); financeChartInstance = null; }
+    if (expenseChartInstance) { expenseChartInstance.destroy(); expenseChartInstance = null; }
+    closeModal('resetModal');
+    navigateTo('dashboard');
+    renderAll();
+    showToast('🔄 All data has been reset!', 'warning');
+  });
+
+  // Allow pressing Enter in the input to trigger confirm
+  document.getElementById('resetConfirmInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('confirmResetBtn').click();
+  });
+}
+
+// ---------- WALLET CORE ----------
+function computeBalance() {
+  return state.walletTransactions.reduce((bal, t) => bal + t.amount, state.startingBalance);
+}
+
+function addWalletTransaction(type, desc, amount) {
+  const newBal = computeBalance() + amount;
+  const tx = { id: uid(), ts: new Date().toISOString(), type, desc, amount, balanceAfter: newBal };
+  state.walletTransactions.push(tx);
+  renderWallet();
+  updateDashStats();
+  return tx;
+}
+
+function renderWallet() {
+  const balance = computeBalance();
+  const totalSalesAmt = state.walletTransactions.filter(t => t.type === 'sale').reduce((s,t) => s + t.amount, 0);
+  const totalPurchasesAmt = Math.abs(state.walletTransactions.filter(t => t.type === 'purchase').reduce((s,t) => s + t.amount, 0));
+
+  const heroEl = document.getElementById('walletHeroAmount');
+  if (heroEl) {
+    heroEl.textContent = fmtMoney(balance);
+    heroEl.classList.toggle('negative', balance < 0);
+    document.getElementById('walletHeroSub').textContent =
+      `Starting: ${fmtMoney(state.startingBalance)}  |  +${fmtMoney(totalSalesAmt)} from sales  |  -${fmtMoney(totalPurchasesAmt)} from purchases`;
+    document.getElementById('startingBalanceInput').value = state.startingBalance || '';
+  }
+
+  const topbar = document.getElementById('topbarBalance');
+  topbar.textContent = '💰 ' + fmtMoney(balance);
+  topbar.classList.toggle('negative', balance < 0);
+
+  const tbody = document.getElementById('walletHistoryBody');
+  if (!tbody) return;
+  if (!state.walletTransactions.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-row">No transactions yet. Set a starting balance to begin!</td></tr>';
+    return;
+  }
+  const typeConfig = {
+    start:    { label: '🏁 Starting Balance', cls: 'badge-blue' },
+    sale:     { label: '💰 Sale',             cls: 'badge-green' },
+    purchase: { label: '🛒 Purchase',         cls: 'badge-red' },
+    add:      { label: '➕ Manual Add',       cls: 'badge-teal' },
+    subtract: { label: '➖ Manual Deduct',    cls: 'badge-orange' },
+    update:   { label: '✏️ Balance Update',   cls: 'badge-purple' },
+  };
+  tbody.innerHTML = [...state.walletTransactions].reverse().map(t => {
+    const cfg = typeConfig[t.type] || { label: t.type, cls: 'badge-gray' };
+    const amtStr = t.amount >= 0
+      ? `<span style="color:var(--accent-green);font-weight:700">+${fmtMoney(t.amount)}</span>`
+      : `<span style="color:var(--accent-red);font-weight:700">${fmtMoney(t.amount)}</span>`;
+    const balStr = t.balanceAfter >= 0
+      ? `<strong style="color:var(--accent-green)">${fmtMoney(t.balanceAfter)}</strong>`
+      : `<strong style="color:var(--accent-red)">${fmtMoney(t.balanceAfter)}</strong>`;
+    const dt = new Date(t.ts);
+    const dateStr = dt.toLocaleDateString() + ' ' + dt.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    return `<tr>
+      <td style="white-space:nowrap;font-size:0.8rem">${dateStr}</td>
+      <td><span class="badge ${cfg.cls}">${cfg.label}</span></td>
+      <td>${esc(t.desc)}</td>
+      <td>${amtStr}</td>
+      <td>${balStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+function clearWalletHistory() {
+  if (!state.walletTransactions.length) return;
+  confirmDelete(() => {
+    state.walletTransactions = [];
+    state.startingBalance = 0;
+    renderWallet();
+    updateDashStats();
+    saveState();
+    showToast('Wallet history cleared.', 'warning');
+  });
+}
+
 // ---------- NAVIGATION ----------
 function setupNav() {
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', e => {
       e.preventDefault();
       navigateTo(link.dataset.page);
-      // close mobile sidebar
       document.getElementById('sidebar').classList.remove('mobile-open');
     });
   });
+  document.getElementById('topbarBalance').addEventListener('click', () => navigateTo('wallet'));
 }
 
 function navigateTo(page) {
   document.querySelectorAll('.nav-link').forEach(l => l.classList.toggle('active', l.dataset.page === page));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
   const titles = {
-    dashboard: 'Dashboard', fields: 'Fields', equipment: 'Equipment',
-    crops: 'Crops & Harvest', sales: 'Sales', purchases: 'Purchases',
-    finance: 'Finances', animals: 'Animals'
+    dashboard:'Dashboard', wallet:'Wallet / Balance', fields:'Fields',
+    equipment:'Equipment', crops:'Crops & Harvest', sales:'Sales',
+    purchases:'Purchases', finance:'Finances', animals:'Animals'
   };
   document.getElementById('pageTitle').textContent = titles[page] || page;
   if (page === 'finance') renderFinanceCharts();
   if (page === 'dashboard') renderFinanceBarChart();
+  if (page === 'wallet') renderWallet();
 }
 
 // ---------- SIDEBAR ----------
 function setupSidebar() {
   const sidebar = document.getElementById('sidebar');
-  document.getElementById('sidebarToggle').addEventListener('click', () => {
-    sidebar.classList.toggle('collapsed');
-  });
-  document.getElementById('mobileMenuBtn').addEventListener('click', () => {
-    sidebar.classList.toggle('mobile-open');
-  });
+  document.getElementById('sidebarToggle').addEventListener('click', () => sidebar.classList.toggle('collapsed'));
+  document.getElementById('mobileMenuBtn').addEventListener('click', () => sidebar.classList.toggle('mobile-open'));
   document.getElementById('editFarmNameBtn').addEventListener('click', () => {
     document.getElementById('farmNameInput').value = state.farmName;
     document.getElementById('seasonSelect').value = state.season;
@@ -98,33 +229,21 @@ function setupSidebar() {
 }
 
 // ---------- MODALS ----------
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
-}
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-}
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function setupModals() {
   document.querySelectorAll('.modal-close, [data-modal]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.modal;
-      if (id) closeModal(id);
-    });
+    btn.addEventListener('click', () => { if (btn.dataset.modal) closeModal(btn.dataset.modal); });
   });
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
-    overlay.addEventListener('click', e => {
-      if (e.target === overlay) closeModal(overlay.id);
-    });
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay.id); });
   });
   document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
     if (pendingDeleteFn) { pendingDeleteFn(); pendingDeleteFn = null; }
     closeModal('confirmModal');
   });
 }
-function confirmDelete(fn) {
-  pendingDeleteFn = fn;
-  openModal('confirmModal');
-}
+function confirmDelete(fn) { pendingDeleteFn = fn; openModal('confirmModal'); }
 
 // ---------- TOAST ----------
 function showToast(msg, type = 'success') {
@@ -132,23 +251,19 @@ function showToast(msg, type = 'success') {
   t.textContent = msg;
   t.className = 'toast show ' + (type === 'error' ? 'error' : type === 'warning' ? 'warning' : '');
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3200);
 }
 
 // ---------- ACTIVITY ----------
 function logActivity(msg) {
   const now = new Date();
-  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  state.activity.unshift({ msg, time, date: now.toLocaleDateString() });
+  state.activity.unshift({ msg, time: now.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }), date: now.toLocaleDateString() });
   if (state.activity.length > 50) state.activity.pop();
   renderActivity();
 }
 function renderActivity() {
   const ul = document.getElementById('activityList');
-  if (!state.activity.length) {
-    ul.innerHTML = '<li class="activity-empty">No activity yet. Start tracking your farm!</li>';
-    return;
-  }
+  if (!state.activity.length) { ul.innerHTML = '<li class="activity-empty">No activity yet. Start tracking your farm!</li>'; return; }
   ul.innerHTML = state.activity.slice(0, 20).map(a =>
     `<li><span>${a.msg}</span><span class="act-time">${a.time}</span></li>`
   ).join('');
@@ -156,270 +271,188 @@ function renderActivity() {
 
 // ---------- DASHBOARD STATS ----------
 function updateDashStats() {
-  const totalSales = state.sales.reduce((s, x) => s + (+x.total || 0), 0)
-    + state.finances.filter(f => f.type === 'income').reduce((s, x) => s + (+x.amount || 0), 0);
-  const totalPurchases = state.purchases.reduce((s, x) => s + (+x.total || 0), 0)
-    + state.finances.filter(f => f.type === 'expense').reduce((s, x) => s + (+x.amount || 0), 0);
-  const balance = totalSales - totalPurchases;
+  const balance = computeBalance();
+  const totalSales = state.sales.reduce((s, x) => s + (+x.total || 0), 0);
+  const totalPurchases = state.purchases.reduce((s, x) => s + (+x.total || 0), 0);
   const totalHarvest = state.harvests.reduce((s, x) => s + (+x.amount || 0), 0);
 
-  document.getElementById('statBalance').textContent = fmtMoney(balance);
-  document.getElementById('statBalance').style.color = balance >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  const balEl = document.getElementById('statBalance');
+  balEl.textContent = fmtMoney(balance);
+  balEl.style.color = balance >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+  document.getElementById('statBalanceSub').textContent = `Starting: ${fmtMoney(state.startingBalance)}`;
   document.getElementById('statFields').textContent = state.fields.length;
   document.getElementById('statEquipment').textContent = state.equipment.length;
   document.getElementById('statSales').textContent = fmtMoney(totalSales);
   document.getElementById('statPurchases').textContent = fmtMoney(totalPurchases);
   document.getElementById('statHarvest').textContent = fmtNum(totalHarvest) + ' L';
 
-  // Dashboard field table
-  const tbody = document.getElementById('dashFieldBody');
-  if (!state.fields.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-row">No fields added yet.</td></tr>';
-  } else {
-    tbody.innerHTML = state.fields.map(f =>
-      `<tr><td><strong>${esc(f.name)}</strong></td><td>${f.ha} ha</td><td>${esc(f.crop)}</td>
-       <td>${statusBadge(f.status)}</td><td>${soilBadge(f.soil)}</td></tr>`
-    ).join('');
-  }
+  const topbar = document.getElementById('topbarBalance');
+  topbar.textContent = '💰 ' + fmtMoney(balance);
+  topbar.classList.toggle('negative', balance < 0);
 
-  // Farm name / season
+  const tbody = document.getElementById('dashFieldBody');
+  if (!state.fields.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty-row">No fields added yet.</td></tr>'; }
+  else { tbody.innerHTML = state.fields.map(f => `<tr><td><strong>${esc(f.name)}</strong></td><td>${f.ha} ha</td><td>${esc(f.crop)}</td><td>${statusBadge(f.status)}</td><td>${soilBadge(f.soil)}</td></tr>`).join(''); }
+
+  const seasonEmoji = { Spring:'🌸', Summer:'☀️', Autumn:'🍂', Winter:'❄️' };
   document.getElementById('farmNameDisplay').textContent = state.farmName;
-  const seasonEmoji = { Spring: '🌸', Summer: '☀️', Autumn: '🍂', Winter: '❄️' };
-  document.getElementById('seasonBadge').textContent =
-    `${seasonEmoji[state.season] || '🌿'} ${state.season} – Year ${state.year}`;
+  document.getElementById('seasonBadge').textContent = `${seasonEmoji[state.season]||'🌿'} ${state.season} – Year ${state.year}`;
 }
 
-// ---------- FIELDS ----------
+// ---------- SETUP FORMS ----------
 function setupForms() {
+
+  // Starting Balance
+  document.getElementById('startingBalanceForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const newStart = parseFloat(document.getElementById('startingBalanceInput').value) || 0;
+    const note = document.getElementById('startingBalanceNote').value.trim() || 'Starting balance set';
+    const diff = newStart - state.startingBalance;
+    state.startingBalance = newStart;
+    const newBal = computeBalance();
+    state.walletTransactions.push({
+      id: uid(), ts: new Date().toISOString(),
+      type: state.walletTransactions.length === 0 ? 'start' : 'update',
+      desc: note, amount: diff, balanceAfter: newBal
+    });
+    logActivity(`🏁 Starting balance set to ${fmtMoney(newStart)}`);
+    renderWallet(); updateDashStats(); saveState();
+    showToast(`✅ Starting balance set to ${fmtMoney(newStart)}!`);
+    document.getElementById('startingBalanceNote').value = '';
+  });
+
+  // Manual Adjustment
+  document.getElementById('manualAdjustForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const type = document.getElementById('adjustType').value;
+    const rawAmt = parseFloat(document.getElementById('adjustAmount').value) || 0;
+    const amount = type === 'subtract' ? -rawAmt : rawAmt;
+    const note = document.getElementById('adjustNote').value.trim();
+    addWalletTransaction(type === 'subtract' ? 'subtract' : 'add', note, amount);
+    logActivity(`${type === 'add' ? '➕' : '➖'} Manual ${type}: ${fmtMoney(rawAmt)} — ${note}`);
+    saveState();
+    showToast(`${type === 'add' ? '➕ Added' : '➖ Deducted'} ${fmtMoney(rawAmt)} ${type === 'add' ? 'to' : 'from'} balance!`);
+    document.getElementById('manualAdjustForm').reset();
+  });
+
   // Fields
   document.getElementById('addFieldBtn').addEventListener('click', () => {
-    document.getElementById('fieldForm').reset();
-    document.getElementById('fieldId').value = '';
-    document.getElementById('fieldModalTitle').textContent = 'Add Field';
-    openModal('fieldModal');
+    document.getElementById('fieldForm').reset(); document.getElementById('fieldId').value = '';
+    document.getElementById('fieldModalTitle').textContent = 'Add Field'; openModal('fieldModal');
   });
   document.getElementById('fieldForm').addEventListener('submit', e => {
     e.preventDefault();
     const id = document.getElementById('fieldId').value;
-    const rec = {
-      id: id || uid(),
-      name: document.getElementById('fieldName').value.trim(),
-      ha: document.getElementById('fieldHa').value,
-      crop: document.getElementById('fieldCrop').value,
-      status: document.getElementById('fieldStatus').value,
-      soil: document.getElementById('fieldSoil').value,
-      hired: document.getElementById('fieldHired').value,
-      notes: document.getElementById('fieldNotes').value.trim(),
-    };
-    if (id) {
-      const i = state.fields.findIndex(x => x.id === id);
-      state.fields[i] = rec;
-      logActivity(`✏️ Updated field: ${rec.name}`);
-    } else {
-      state.fields.push(rec);
-      logActivity(`🌱 Added field: ${rec.name} (${rec.ha} ha)`);
-    }
-    closeModal('fieldModal');
-    renderFields();
-    updateDashStats();
-    saveState();
-    showToast(`Field "${rec.name}" saved!`);
+    const rec = { id: id||uid(), name: document.getElementById('fieldName').value.trim(), ha: document.getElementById('fieldHa').value, crop: document.getElementById('fieldCrop').value, status: document.getElementById('fieldStatus').value, soil: document.getElementById('fieldSoil').value, hired: document.getElementById('fieldHired').value, notes: document.getElementById('fieldNotes').value.trim() };
+    if (id) { state.fields[state.fields.findIndex(x=>x.id===id)]=rec; logActivity(`✏️ Updated field: ${rec.name}`); }
+    else { state.fields.push(rec); logActivity(`🌱 Added field: ${rec.name} (${rec.ha} ha)`); }
+    closeModal('fieldModal'); renderFields(); updateDashStats(); saveState(); showToast(`Field "${rec.name}" saved!`);
   });
 
   // Equipment
   document.getElementById('addEquipBtn').addEventListener('click', () => {
-    document.getElementById('equipForm').reset();
-    document.getElementById('equipId').value = '';
-    document.getElementById('equipModalTitle').textContent = 'Add Equipment';
-    openModal('equipModal');
+    document.getElementById('equipForm').reset(); document.getElementById('equipId').value = '';
+    document.getElementById('equipModalTitle').textContent = 'Add Equipment'; openModal('equipModal');
   });
   document.getElementById('equipForm').addEventListener('submit', e => {
     e.preventDefault();
     const id = document.getElementById('equipId').value;
-    const rec = {
-      id: id || uid(),
-      name: document.getElementById('equipName').value.trim(),
-      type: document.getElementById('equipType').value,
-      brand: document.getElementById('equipBrand').value.trim(),
-      price: document.getElementById('equipPrice').value,
-      date: document.getElementById('equipDate').value,
-      condition: document.getElementById('equipCondition').value,
-      field: document.getElementById('equipField').value.trim(),
-      notes: document.getElementById('equipNotes').value.trim(),
-    };
-    if (id) {
-      const i = state.equipment.findIndex(x => x.id === id);
-      state.equipment[i] = rec;
-      logActivity(`✏️ Updated equipment: ${rec.name}`);
-    } else {
-      state.equipment.push(rec);
-      logActivity(`🚜 Added equipment: ${rec.name}`);
-    }
-    closeModal('equipModal');
-    renderEquipment();
-    updateDashStats();
-    saveState();
-    showToast(`Equipment "${rec.name}" saved!`);
+    const rec = { id: id||uid(), name: document.getElementById('equipName').value.trim(), type: document.getElementById('equipType').value, brand: document.getElementById('equipBrand').value.trim(), price: document.getElementById('equipPrice').value, date: document.getElementById('equipDate').value, condition: document.getElementById('equipCondition').value, field: document.getElementById('equipField').value.trim(), notes: document.getElementById('equipNotes').value.trim() };
+    if (id) { state.equipment[state.equipment.findIndex(x=>x.id===id)]=rec; logActivity(`✏️ Updated equipment: ${rec.name}`); }
+    else { state.equipment.push(rec); logActivity(`🚜 Added equipment: ${rec.name}`); }
+    closeModal('equipModal'); renderEquipment(); updateDashStats(); saveState(); showToast(`Equipment "${rec.name}" saved!`);
   });
 
-  // Harvest
+  // Harvests
   document.getElementById('addHarvestBtn').addEventListener('click', () => {
-    document.getElementById('harvestForm').reset();
-    document.getElementById('harvestId').value = '';
-    document.getElementById('harvestModalTitle').textContent = 'Log Harvest';
-    setTodayDates();
-    openModal('harvestModal');
+    document.getElementById('harvestForm').reset(); document.getElementById('harvestId').value = '';
+    document.getElementById('harvestModalTitle').textContent = 'Log Harvest'; setTodayDates(); openModal('harvestModal');
   });
   document.getElementById('harvestForm').addEventListener('submit', e => {
     e.preventDefault();
     const id = document.getElementById('harvestId').value;
-    const rec = {
-      id: id || uid(),
-      date: document.getElementById('harvestDate').value,
-      field: document.getElementById('harvestField').value.trim(),
-      crop: document.getElementById('harvestCrop').value,
-      amount: document.getElementById('harvestAmount').value,
-      quality: document.getElementById('harvestQuality').value,
-      sold: document.getElementById('harvestSold').value,
-      notes: document.getElementById('harvestNotes').value.trim(),
-    };
-    if (id) {
-      const i = state.harvests.findIndex(x => x.id === id);
-      state.harvests[i] = rec;
-      logActivity(`✏️ Updated harvest: ${rec.crop} (${fmtNum(rec.amount)} L)`);
-    } else {
-      state.harvests.push(rec);
-      logActivity(`🌾 Logged harvest: ${rec.crop} – ${fmtNum(rec.amount)} L from ${rec.field}`);
-    }
-    closeModal('harvestModal');
-    renderHarvests();
-    updateDashStats();
-    saveState();
-    showToast(`Harvest logged: ${rec.crop} (${fmtNum(rec.amount)} L)!`);
+    const rec = { id: id||uid(), date: document.getElementById('harvestDate').value, field: document.getElementById('harvestField').value.trim(), crop: document.getElementById('harvestCrop').value, amount: document.getElementById('harvestAmount').value, quality: document.getElementById('harvestQuality').value, sold: document.getElementById('harvestSold').value, notes: document.getElementById('harvestNotes').value.trim() };
+    if (id) { state.harvests[state.harvests.findIndex(x=>x.id===id)]=rec; logActivity(`✏️ Updated harvest`); }
+    else { state.harvests.push(rec); logActivity(`🌾 Logged harvest: ${rec.crop} – ${fmtNum(rec.amount)} L from ${rec.field}`); }
+    closeModal('harvestModal'); renderHarvests(); updateDashStats(); saveState(); showToast(`Harvest logged: ${rec.crop} (${fmtNum(rec.amount)} L)!`);
   });
 
-  // Sales
+  // Sales — AUTO ADD TO WALLET
   document.getElementById('addSaleBtn').addEventListener('click', () => {
-    document.getElementById('saleForm').reset();
-    document.getElementById('saleId').value = '';
-    document.getElementById('saleModalTitle').textContent = 'Log Sale';
-    setTodayDates();
-    openModal('saleModal');
+    document.getElementById('saleForm').reset(); document.getElementById('saleId').value = '';
+    document.getElementById('saleModalTitle').textContent = 'Log Sale'; setTodayDates(); openModal('saleModal');
   });
-  // Auto calc total
   ['saleAmt','salePPU'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
-      const amt = parseFloat(document.getElementById('saleAmt').value) || 0;
-      const ppu = parseFloat(document.getElementById('salePPU').value) || 0;
+      const amt = parseFloat(document.getElementById('saleAmt').value)||0;
+      const ppu = parseFloat(document.getElementById('salePPU').value)||0;
       if (amt && ppu) document.getElementById('saleTotal').value = (amt * ppu).toFixed(2);
     });
   });
   document.getElementById('saleForm').addEventListener('submit', e => {
     e.preventDefault();
-    const id = document.getElementById('saleId').value;
-    const rec = {
-      id: id || uid(),
-      date: document.getElementById('saleDate').value,
-      item: document.getElementById('saleItem').value.trim(),
-      cat: document.getElementById('saleCat').value,
-      amt: document.getElementById('saleAmt').value,
-      ppu: document.getElementById('salePPU').value,
-      total: document.getElementById('saleTotal').value,
-      buyer: document.getElementById('saleBuyer').value.trim(),
-      notes: document.getElementById('saleNotes').value.trim(),
-    };
-    if (id) {
-      const i = state.sales.findIndex(x => x.id === id);
-      state.sales[i] = rec;
+    const existingId = document.getElementById('saleId').value;
+    const rec = { id: existingId||uid(), date: document.getElementById('saleDate').value, item: document.getElementById('saleItem').value.trim(), cat: document.getElementById('saleCat').value, amt: document.getElementById('saleAmt').value, ppu: document.getElementById('salePPU').value, total: document.getElementById('saleTotal').value, buyer: document.getElementById('saleBuyer').value.trim(), notes: document.getElementById('saleNotes').value.trim() };
+    const saleAmount = parseFloat(rec.total) || 0;
+    if (existingId) {
+      const old = state.sales.find(x=>x.id===existingId);
+      const oldAmt = parseFloat(old?.total)||0;
+      state.sales[state.sales.findIndex(x=>x.id===existingId)]=rec;
+      if (saleAmount !== oldAmt) addWalletTransaction('sale', `Sale edit: ${rec.item}`, saleAmount - oldAmt);
       logActivity(`✏️ Updated sale: ${rec.item}`);
     } else {
       state.sales.push(rec);
-      logActivity(`💰 Sale: ${rec.item} – ${fmtMoney(rec.total)}`);
+      if (saleAmount > 0) { addWalletTransaction('sale', `Sale: ${rec.item}`, saleAmount); logActivity(`💰 Sale: ${rec.item} → +${fmtMoney(saleAmount)} added to balance`); }
+      else logActivity(`💰 Sale logged: ${rec.item}`);
     }
-    closeModal('saleModal');
-    renderSales();
-    updateDashStats();
-    saveState();
-    showToast(`Sale "${rec.item}" saved!`);
+    closeModal('saleModal'); renderSales(); updateDashStats(); saveState();
+    showToast(`✅ Sale saved! +${fmtMoney(saleAmount)} added to balance.`);
   });
 
-  // Purchases
+  // Purchases — AUTO DEDUCT FROM WALLET
   document.getElementById('addPurchaseBtn').addEventListener('click', () => {
-    document.getElementById('purchaseForm').reset();
-    document.getElementById('purchaseId').value = '';
-    document.getElementById('purchaseModalTitle').textContent = 'Log Purchase';
-    setTodayDates();
-    openModal('purchaseModal');
+    document.getElementById('purchaseForm').reset(); document.getElementById('purchaseId').value = '';
+    document.getElementById('purchaseModalTitle').textContent = 'Log Purchase'; setTodayDates(); openModal('purchaseModal');
   });
   ['purchaseQty','purchaseUC'].forEach(id => {
     document.getElementById(id).addEventListener('input', () => {
-      const q = parseFloat(document.getElementById('purchaseQty').value) || 0;
-      const u = parseFloat(document.getElementById('purchaseUC').value) || 0;
+      const q = parseFloat(document.getElementById('purchaseQty').value)||0;
+      const u = parseFloat(document.getElementById('purchaseUC').value)||0;
       if (q && u) document.getElementById('purchaseTotal').value = (q * u).toFixed(2);
     });
   });
   document.getElementById('purchaseForm').addEventListener('submit', e => {
     e.preventDefault();
-    const id = document.getElementById('purchaseId').value;
-    const rec = {
-      id: id || uid(),
-      date: document.getElementById('purchaseDate').value,
-      item: document.getElementById('purchaseItem').value.trim(),
-      cat: document.getElementById('purchaseCat').value,
-      qty: document.getElementById('purchaseQty').value,
-      uc: document.getElementById('purchaseUC').value,
-      total: document.getElementById('purchaseTotal').value,
-      seller: document.getElementById('purchaseSeller').value.trim(),
-      notes: document.getElementById('purchaseNotes').value.trim(),
-    };
-    if (id) {
-      const i = state.purchases.findIndex(x => x.id === id);
-      state.purchases[i] = rec;
+    const existingId = document.getElementById('purchaseId').value;
+    const rec = { id: existingId||uid(), date: document.getElementById('purchaseDate').value, item: document.getElementById('purchaseItem').value.trim(), cat: document.getElementById('purchaseCat').value, qty: document.getElementById('purchaseQty').value, uc: document.getElementById('purchaseUC').value, total: document.getElementById('purchaseTotal').value, seller: document.getElementById('purchaseSeller').value.trim(), notes: document.getElementById('purchaseNotes').value.trim() };
+    const purchaseAmount = parseFloat(rec.total) || 0;
+    if (existingId) {
+      const old = state.purchases.find(x=>x.id===existingId);
+      const oldAmt = parseFloat(old?.total)||0;
+      state.purchases[state.purchases.findIndex(x=>x.id===existingId)]=rec;
+      if (purchaseAmount !== oldAmt) addWalletTransaction('purchase', `Purchase edit: ${rec.item}`, -(purchaseAmount - oldAmt));
       logActivity(`✏️ Updated purchase: ${rec.item}`);
     } else {
       state.purchases.push(rec);
-      logActivity(`🛒 Purchase: ${rec.item} – ${fmtMoney(rec.total)}`);
+      if (purchaseAmount > 0) { addWalletTransaction('purchase', `Purchase: ${rec.item}`, -purchaseAmount); logActivity(`🛒 Purchase: ${rec.item} → -${fmtMoney(purchaseAmount)} deducted from balance`); }
+      else logActivity(`🛒 Purchase logged: ${rec.item}`);
     }
-    closeModal('purchaseModal');
-    renderPurchases();
-    updateDashStats();
-    saveState();
-    showToast(`Purchase "${rec.item}" saved!`);
+    closeModal('purchaseModal'); renderPurchases(); updateDashStats(); saveState();
+    showToast(`✅ Purchase saved! -${fmtMoney(purchaseAmount)} deducted from balance.`, 'warning');
   });
 
   // Animals
   document.getElementById('addAnimalBtn').addEventListener('click', () => {
-    document.getElementById('animalForm').reset();
-    document.getElementById('animalId').value = '';
-    document.getElementById('animalModalTitle').textContent = 'Add Animal';
-    openModal('animalModal');
+    document.getElementById('animalForm').reset(); document.getElementById('animalId').value = '';
+    document.getElementById('animalModalTitle').textContent = 'Add Animal'; openModal('animalModal');
   });
   document.getElementById('animalForm').addEventListener('submit', e => {
     e.preventDefault();
     const id = document.getElementById('animalId').value;
-    const rec = {
-      id: id || uid(),
-      type: document.getElementById('animalType').value,
-      name: document.getElementById('animalName').value.trim(),
-      count: document.getElementById('animalCount').value,
-      pen: document.getElementById('animalPen').value.trim(),
-      feed: document.getElementById('animalFeed').value,
-      prod: document.getElementById('animalProd').value.trim(),
-      value: document.getElementById('animalValue').value,
-      notes: document.getElementById('animalNotes').value.trim(),
-    };
-    if (id) {
-      const i = state.animals.findIndex(x => x.id === id);
-      state.animals[i] = rec;
-      logActivity(`✏️ Updated animal: ${rec.name}`);
-    } else {
-      state.animals.push(rec);
-      logActivity(`🐄 Added animal: ${rec.type} – ${rec.name} (${rec.count})`);
-    }
-    closeModal('animalModal');
-    renderAnimals();
-    saveState();
-    showToast(`Animal "${rec.name}" saved!`);
+    const rec = { id: id||uid(), type: document.getElementById('animalType').value, name: document.getElementById('animalName').value.trim(), count: document.getElementById('animalCount').value, pen: document.getElementById('animalPen').value.trim(), feed: document.getElementById('animalFeed').value, prod: document.getElementById('animalProd').value.trim(), value: document.getElementById('animalValue').value, notes: document.getElementById('animalNotes').value.trim() };
+    if (id) { state.animals[state.animals.findIndex(x=>x.id===id)]=rec; logActivity(`✏️ Updated animal: ${rec.name}`); }
+    else { state.animals.push(rec); logActivity(`🐄 Added animal: ${rec.type} – ${rec.name} (${rec.count})`); }
+    closeModal('animalModal'); renderAnimals(); saveState(); showToast(`Animal "${rec.name}" saved!`);
   });
 
   // Farm Name
@@ -428,527 +461,226 @@ function setupForms() {
     state.farmName = document.getElementById('farmNameInput').value.trim() || 'My Farm';
     state.season = document.getElementById('seasonSelect').value;
     state.year = parseInt(document.getElementById('yearInput').value) || 1;
-    closeModal('farmNameModal');
-    updateDashStats();
-    saveState();
-    showToast('Farm info updated!');
+    closeModal('farmNameModal'); updateDashStats(); saveState(); showToast('Farm info updated!');
   });
 
-  // Finance
+  // Finance entries
   document.getElementById('financeForm').addEventListener('submit', e => {
     e.preventDefault();
-    const rec = {
-      id: uid(),
-      date: document.getElementById('finDate').value,
-      type: document.getElementById('finType').value,
-      cat: document.getElementById('finCategory').value,
-      amount: document.getElementById('finAmount').value,
-      desc: document.getElementById('finDesc').value.trim(),
-    };
+    const rec = { id: uid(), date: document.getElementById('finDate').value, type: document.getElementById('finType').value, cat: document.getElementById('finCategory').value, amount: document.getElementById('finAmount').value, desc: document.getElementById('finDesc').value.trim() };
     state.finances.push(rec);
     logActivity(`💵 Finance entry: ${rec.cat} – ${fmtMoney(rec.amount)} (${rec.type})`);
-    document.getElementById('financeForm').reset();
-    setTodayDates();
-    renderFinances();
-    updateDashStats();
-    renderFinanceCharts();
-    saveState();
-    showToast('Finance entry added!');
+    document.getElementById('financeForm').reset(); setTodayDates();
+    renderFinances(); updateDashStats(); renderFinanceCharts(); saveState(); showToast('Finance entry added!');
   });
 }
 
 // ---------- RENDER FIELDS ----------
 function renderFields() {
   const tbody = document.getElementById('fieldTableBody');
-  if (!state.fields.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty-row">No fields added yet.</td></tr>';
-    return;
-  }
+  if (!state.fields.length) { tbody.innerHTML = '<tr><td colspan="9" class="empty-row">No fields added yet.</td></tr>'; return; }
   tbody.innerHTML = state.fields.map((f, i) => `
-    <tr>
-      <td>${i + 1}</td>
-      <td><strong>${esc(f.name)}</strong></td>
-      <td>${f.ha} ha</td>
-      <td>${esc(f.crop)}</td>
-      <td>${statusBadge(f.status)}</td>
-      <td>${soilBadge(f.soil)}</td>
-      <td>${f.hired === 'Yes' ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-gray">No</span>'}</td>
-      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(f.notes)}">${esc(f.notes) || '—'}</td>
-      <td>
-        <div class="table-actions">
-          <button class="btn btn-outline btn-icon" onclick="editField('${f.id}')" title="Edit"><i class="fa fa-pen"></i></button>
-          <button class="btn btn-red btn-icon" onclick="deleteField('${f.id}')" title="Delete"><i class="fa fa-trash"></i></button>
-        </div>
-      </td>
-    </tr>`).join('');
+    <tr><td>${i+1}</td><td><strong>${esc(f.name)}</strong></td><td>${f.ha} ha</td><td>${esc(f.crop)}</td><td>${statusBadge(f.status)}</td><td>${soilBadge(f.soil)}</td>
+    <td>${f.hired==='Yes'?'<span class="badge badge-green">Yes</span>':'<span class="badge badge-gray">No</span>'}</td>
+    <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(f.notes)}">${esc(f.notes)||'—'}</td>
+    <td><div class="table-actions"><button class="btn btn-outline btn-icon" onclick="editField('${f.id}')"><i class="fa fa-pen"></i></button><button class="btn btn-red btn-icon" onclick="deleteField('${f.id}')"><i class="fa fa-trash"></i></button></div></td></tr>`).join('');
 }
-
 function editField(id) {
-  const f = state.fields.find(x => x.id === id);
-  if (!f) return;
-  document.getElementById('fieldId').value = f.id;
-  document.getElementById('fieldName').value = f.name;
-  document.getElementById('fieldHa').value = f.ha;
-  document.getElementById('fieldCrop').value = f.crop;
-  document.getElementById('fieldStatus').value = f.status;
-  document.getElementById('fieldSoil').value = f.soil;
-  document.getElementById('fieldHired').value = f.hired;
-  document.getElementById('fieldNotes').value = f.notes;
-  document.getElementById('fieldModalTitle').textContent = 'Edit Field';
-  openModal('fieldModal');
+  const f=state.fields.find(x=>x.id===id);if(!f)return;
+  document.getElementById('fieldId').value=f.id; document.getElementById('fieldName').value=f.name; document.getElementById('fieldHa').value=f.ha;
+  document.getElementById('fieldCrop').value=f.crop; document.getElementById('fieldStatus').value=f.status; document.getElementById('fieldSoil').value=f.soil;
+  document.getElementById('fieldHired').value=f.hired; document.getElementById('fieldNotes').value=f.notes;
+  document.getElementById('fieldModalTitle').textContent='Edit Field'; openModal('fieldModal');
 }
 function deleteField(id) {
-  const f = state.fields.find(x => x.id === id);
-  confirmDelete(() => {
-    state.fields = state.fields.filter(x => x.id !== id);
-    logActivity(`🗑️ Deleted field: ${f?.name}`);
-    renderFields(); updateDashStats(); saveState();
-    showToast('Field deleted.', 'warning');
-  });
+  const f=state.fields.find(x=>x.id===id);
+  confirmDelete(()=>{ state.fields=state.fields.filter(x=>x.id!==id); logActivity(`🗑️ Deleted field: ${f?.name}`); renderFields(); updateDashStats(); saveState(); showToast('Field deleted.','warning'); });
 }
 
 // ---------- RENDER EQUIPMENT ----------
 function renderEquipment() {
-  const tbody = document.getElementById('equipTableBody');
-  if (!state.equipment.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty-row">No equipment added yet.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = state.equipment.map(eq => `
-    <tr>
-      <td><strong>${esc(eq.name)}</strong></td>
-      <td>${esc(eq.type)}</td>
-      <td>${esc(eq.brand) || '—'}</td>
-      <td>${eq.price ? fmtMoney(eq.price) : '—'}</td>
-      <td>${eq.date || '—'}</td>
-      <td>${conditionBadge(eq.condition)}</td>
-      <td>${esc(eq.field) || '—'}</td>
-      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(eq.notes)}">${esc(eq.notes) || '—'}</td>
-      <td>
-        <div class="table-actions">
-          <button class="btn btn-outline btn-icon" onclick="editEquip('${eq.id}')"><i class="fa fa-pen"></i></button>
-          <button class="btn btn-red btn-icon" onclick="deleteEquip('${eq.id}')"><i class="fa fa-trash"></i></button>
-        </div>
-      </td>
-    </tr>`).join('');
+  const tbody=document.getElementById('equipTableBody');
+  if(!state.equipment.length){tbody.innerHTML='<tr><td colspan="9" class="empty-row">No equipment added yet.</td></tr>';return;}
+  tbody.innerHTML=state.equipment.map(eq=>`
+    <tr><td><strong>${esc(eq.name)}</strong></td><td>${esc(eq.type)}</td><td>${esc(eq.brand)||'—'}</td><td>${eq.price?fmtMoney(eq.price):'—'}</td>
+    <td>${eq.date||'—'}</td><td>${conditionBadge(eq.condition)}</td><td>${esc(eq.field)||'—'}</td>
+    <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(eq.notes)||'—'}</td>
+    <td><div class="table-actions"><button class="btn btn-outline btn-icon" onclick="editEquip('${eq.id}')"><i class="fa fa-pen"></i></button><button class="btn btn-red btn-icon" onclick="deleteEquip('${eq.id}')"><i class="fa fa-trash"></i></button></div></td></tr>`).join('');
 }
 function editEquip(id) {
-  const eq = state.equipment.find(x => x.id === id);
-  if (!eq) return;
-  document.getElementById('equipId').value = eq.id;
-  document.getElementById('equipName').value = eq.name;
-  document.getElementById('equipType').value = eq.type;
-  document.getElementById('equipBrand').value = eq.brand;
-  document.getElementById('equipPrice').value = eq.price;
-  document.getElementById('equipDate').value = eq.date;
-  document.getElementById('equipCondition').value = eq.condition;
-  document.getElementById('equipField').value = eq.field;
-  document.getElementById('equipNotes').value = eq.notes;
-  document.getElementById('equipModalTitle').textContent = 'Edit Equipment';
-  openModal('equipModal');
+  const eq=state.equipment.find(x=>x.id===id);if(!eq)return;
+  document.getElementById('equipId').value=eq.id; document.getElementById('equipName').value=eq.name; document.getElementById('equipType').value=eq.type;
+  document.getElementById('equipBrand').value=eq.brand; document.getElementById('equipPrice').value=eq.price; document.getElementById('equipDate').value=eq.date;
+  document.getElementById('equipCondition').value=eq.condition; document.getElementById('equipField').value=eq.field; document.getElementById('equipNotes').value=eq.notes;
+  document.getElementById('equipModalTitle').textContent='Edit Equipment'; openModal('equipModal');
 }
 function deleteEquip(id) {
-  const eq = state.equipment.find(x => x.id === id);
-  confirmDelete(() => {
-    state.equipment = state.equipment.filter(x => x.id !== id);
-    logActivity(`🗑️ Deleted equipment: ${eq?.name}`);
-    renderEquipment(); updateDashStats(); saveState();
-    showToast('Equipment deleted.', 'warning');
-  });
+  const eq=state.equipment.find(x=>x.id===id);
+  confirmDelete(()=>{ state.equipment=state.equipment.filter(x=>x.id!==id); logActivity(`🗑️ Deleted equipment: ${eq?.name}`); renderEquipment(); updateDashStats(); saveState(); showToast('Equipment deleted.','warning'); });
 }
 
 // ---------- RENDER HARVESTS ----------
 function renderHarvests() {
-  // Summary
-  const groups = { grain: 0, canola: 0, corn: 0, grass: 0, root: 0, other: 0 };
-  const grainCrops = ['Wheat','Barley','Oat'];
-  const canolaCrops = ['Canola','Sunflower'];
-  const cornCrops = ['Corn','Soybeans'];
-  const grassCrops = ['Grass','Hay','Silage'];
-  const rootCrops = ['Potatoes','Sugar Beet','Cotton'];
-  state.harvests.forEach(h => {
-    const amt = +h.amount || 0;
-    if (grainCrops.includes(h.crop)) groups.grain += amt;
-    else if (canolaCrops.includes(h.crop)) groups.canola += amt;
-    else if (cornCrops.includes(h.crop)) groups.corn += amt;
-    else if (grassCrops.includes(h.crop)) groups.grass += amt;
-    else if (rootCrops.includes(h.crop)) groups.root += amt;
-    else groups.other += amt;
-  });
-  document.getElementById('harvestGrain').textContent = fmtNum(groups.grain) + ' L';
-  document.getElementById('harvestCanola').textContent = fmtNum(groups.canola) + ' L';
-  document.getElementById('harvestCorn').textContent = fmtNum(groups.corn) + ' L';
-  document.getElementById('harvestGrass').textContent = fmtNum(groups.grass) + ' L';
-  document.getElementById('harvestRoot').textContent = fmtNum(groups.root) + ' L';
-  document.getElementById('harvestOther').textContent = fmtNum(groups.other) + ' L';
-
-  const tbody = document.getElementById('harvestTableBody');
-  if (!state.harvests.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-row">No harvests logged yet.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = [...state.harvests].reverse().map(h => `
-    <tr>
-      <td>${h.date || '—'}</td>
-      <td>${esc(h.field)}</td>
-      <td>${esc(h.crop)}</td>
-      <td><strong>${fmtNum(h.amount)} L</strong></td>
-      <td>${qualityBadge(h.quality)}</td>
-      <td>${h.sold === 'Yes' ? '<span class="badge badge-green">Yes</span>' : '<span class="badge badge-gray">No</span>'}</td>
-      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.notes) || '—'}</td>
-      <td>
-        <div class="table-actions">
-          <button class="btn btn-outline btn-icon" onclick="editHarvest('${h.id}')"><i class="fa fa-pen"></i></button>
-          <button class="btn btn-red btn-icon" onclick="deleteHarvest('${h.id}')"><i class="fa fa-trash"></i></button>
-        </div>
-      </td>
-    </tr>`).join('');
+  const g={grain:0,canola:0,corn:0,grass:0,root:0,other:0};
+  state.harvests.forEach(h=>{const a=+h.amount||0;if(['Wheat','Barley','Oat'].includes(h.crop))g.grain+=a;else if(['Canola','Sunflower'].includes(h.crop))g.canola+=a;else if(['Corn','Soybeans'].includes(h.crop))g.corn+=a;else if(['Grass','Hay','Silage'].includes(h.crop))g.grass+=a;else if(['Potatoes','Sugar Beet','Cotton'].includes(h.crop))g.root+=a;else g.other+=a;});
+  document.getElementById('harvestGrain').textContent=fmtNum(g.grain)+' L'; document.getElementById('harvestCanola').textContent=fmtNum(g.canola)+' L';
+  document.getElementById('harvestCorn').textContent=fmtNum(g.corn)+' L'; document.getElementById('harvestGrass').textContent=fmtNum(g.grass)+' L';
+  document.getElementById('harvestRoot').textContent=fmtNum(g.root)+' L'; document.getElementById('harvestOther').textContent=fmtNum(g.other)+' L';
+  const tbody=document.getElementById('harvestTableBody');
+  if(!state.harvests.length){tbody.innerHTML='<tr><td colspan="8" class="empty-row">No harvests logged yet.</td></tr>';return;}
+  tbody.innerHTML=[...state.harvests].reverse().map(h=>`
+    <tr><td>${h.date||'—'}</td><td>${esc(h.field)}</td><td>${esc(h.crop)}</td><td><strong>${fmtNum(h.amount)} L</strong></td>
+    <td>${qualityBadge(h.quality)}</td><td>${h.sold==='Yes'?'<span class="badge badge-green">Yes</span>':'<span class="badge badge-gray">No</span>'}</td>
+    <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(h.notes)||'—'}</td>
+    <td><div class="table-actions"><button class="btn btn-outline btn-icon" onclick="editHarvest('${h.id}')"><i class="fa fa-pen"></i></button><button class="btn btn-red btn-icon" onclick="deleteHarvest('${h.id}')"><i class="fa fa-trash"></i></button></div></td></tr>`).join('');
 }
 function editHarvest(id) {
-  const h = state.harvests.find(x => x.id === id);
-  if (!h) return;
-  document.getElementById('harvestId').value = h.id;
-  document.getElementById('harvestDate').value = h.date;
-  document.getElementById('harvestField').value = h.field;
-  document.getElementById('harvestCrop').value = h.crop;
-  document.getElementById('harvestAmount').value = h.amount;
-  document.getElementById('harvestQuality').value = h.quality;
-  document.getElementById('harvestSold').value = h.sold;
-  document.getElementById('harvestNotes').value = h.notes;
-  document.getElementById('harvestModalTitle').textContent = 'Edit Harvest';
-  openModal('harvestModal');
+  const h=state.harvests.find(x=>x.id===id);if(!h)return;
+  document.getElementById('harvestId').value=h.id; document.getElementById('harvestDate').value=h.date; document.getElementById('harvestField').value=h.field;
+  document.getElementById('harvestCrop').value=h.crop; document.getElementById('harvestAmount').value=h.amount; document.getElementById('harvestQuality').value=h.quality;
+  document.getElementById('harvestSold').value=h.sold; document.getElementById('harvestNotes').value=h.notes;
+  document.getElementById('harvestModalTitle').textContent='Edit Harvest'; openModal('harvestModal');
 }
 function deleteHarvest(id) {
-  const h = state.harvests.find(x => x.id === id);
-  confirmDelete(() => {
-    state.harvests = state.harvests.filter(x => x.id !== id);
-    logActivity(`🗑️ Deleted harvest entry`);
-    renderHarvests(); updateDashStats(); saveState();
-    showToast('Harvest deleted.', 'warning');
-  });
+  confirmDelete(()=>{ state.harvests=state.harvests.filter(x=>x.id!==id); logActivity(`🗑️ Deleted harvest`); renderHarvests(); updateDashStats(); saveState(); showToast('Harvest deleted.','warning'); });
 }
 
 // ---------- RENDER SALES ----------
 function renderSales() {
-  const total = state.sales.reduce((s, x) => s + (+x.total || 0), 0);
-  document.getElementById('totalSalesRevenue').textContent = fmtMoney(total);
-  document.getElementById('totalSalesCount').textContent = state.sales.length;
-
-  const tbody = document.getElementById('salesTableBody');
-  if (!state.sales.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty-row">No sales logged yet.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = [...state.sales].reverse().map(s => `
-    <tr>
-      <td>${s.date || '—'}</td>
-      <td><strong>${esc(s.item)}</strong></td>
-      <td>${catBadge(s.cat)}</td>
-      <td>${s.amt ? fmtNum(s.amt) : '—'}</td>
-      <td>${s.ppu ? fmtMoney(s.ppu) : '—'}</td>
-      <td><strong style="color:var(--accent-green)">${fmtMoney(s.total)}</strong></td>
-      <td>${esc(s.buyer) || '—'}</td>
-      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.notes) || '—'}</td>
-      <td>
-        <div class="table-actions">
-          <button class="btn btn-outline btn-icon" onclick="editSale('${s.id}')"><i class="fa fa-pen"></i></button>
-          <button class="btn btn-red btn-icon" onclick="deleteSale('${s.id}')"><i class="fa fa-trash"></i></button>
-        </div>
-      </td>
-    </tr>`).join('');
+  const total=state.sales.reduce((s,x)=>s+(+x.total||0),0);
+  document.getElementById('totalSalesRevenue').textContent=fmtMoney(total); document.getElementById('totalSalesCount').textContent=state.sales.length;
+  const tbody=document.getElementById('salesTableBody');
+  if(!state.sales.length){tbody.innerHTML='<tr><td colspan="9" class="empty-row">No sales logged yet.</td></tr>';return;}
+  tbody.innerHTML=[...state.sales].reverse().map(s=>`
+    <tr><td>${s.date||'—'}</td><td><strong>${esc(s.item)}</strong></td><td>${catBadge(s.cat)}</td><td>${s.amt?fmtNum(s.amt):'—'}</td>
+    <td>${s.ppu?fmtMoney(s.ppu):'—'}</td><td><strong style="color:var(--accent-green)">${fmtMoney(s.total)}</strong></td>
+    <td>${esc(s.buyer)||'—'}</td><td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.notes)||'—'}</td>
+    <td><div class="table-actions"><button class="btn btn-outline btn-icon" onclick="editSale('${s.id}')"><i class="fa fa-pen"></i></button><button class="btn btn-red btn-icon" onclick="deleteSale('${s.id}')"><i class="fa fa-trash"></i></button></div></td></tr>`).join('');
 }
 function editSale(id) {
-  const s = state.sales.find(x => x.id === id);
-  if (!s) return;
-  document.getElementById('saleId').value = s.id;
-  document.getElementById('saleDate').value = s.date;
-  document.getElementById('saleItem').value = s.item;
-  document.getElementById('saleCat').value = s.cat;
-  document.getElementById('saleAmt').value = s.amt;
-  document.getElementById('salePPU').value = s.ppu;
-  document.getElementById('saleTotal').value = s.total;
-  document.getElementById('saleBuyer').value = s.buyer;
-  document.getElementById('saleNotes').value = s.notes;
-  document.getElementById('saleModalTitle').textContent = 'Edit Sale';
-  openModal('saleModal');
+  const s=state.sales.find(x=>x.id===id);if(!s)return;
+  document.getElementById('saleId').value=s.id; document.getElementById('saleDate').value=s.date; document.getElementById('saleItem').value=s.item;
+  document.getElementById('saleCat').value=s.cat; document.getElementById('saleAmt').value=s.amt; document.getElementById('salePPU').value=s.ppu;
+  document.getElementById('saleTotal').value=s.total; document.getElementById('saleBuyer').value=s.buyer; document.getElementById('saleNotes').value=s.notes;
+  document.getElementById('saleModalTitle').textContent='Edit Sale'; openModal('saleModal');
 }
 function deleteSale(id) {
-  confirmDelete(() => {
-    state.sales = state.sales.filter(x => x.id !== id);
-    logActivity(`🗑️ Deleted sale`);
-    renderSales(); updateDashStats(); saveState();
-    showToast('Sale deleted.', 'warning');
+  const s=state.sales.find(x=>x.id===id);
+  confirmDelete(()=>{
+    const amt=parseFloat(s?.total)||0;
+    state.sales=state.sales.filter(x=>x.id!==id);
+    if(amt>0) addWalletTransaction('subtract',`Deleted sale: ${s?.item}`,-amt);
+    logActivity(`🗑️ Deleted sale: ${s?.item}`); renderSales(); updateDashStats(); saveState(); showToast('Sale deleted (balance adjusted).','warning');
   });
 }
 
 // ---------- RENDER PURCHASES ----------
 function renderPurchases() {
-  const total = state.purchases.reduce((s, x) => s + (+x.total || 0), 0);
-  document.getElementById('totalPurchasesSpent').textContent = fmtMoney(total);
-  document.getElementById('totalPurchasesCount').textContent = state.purchases.length;
-
-  const tbody = document.getElementById('purchaseTableBody');
-  if (!state.purchases.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty-row">No purchases logged yet.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = [...state.purchases].reverse().map(p => `
-    <tr>
-      <td>${p.date || '—'}</td>
-      <td><strong>${esc(p.item)}</strong></td>
-      <td>${catBadge(p.cat)}</td>
-      <td>${p.qty || 1}</td>
-      <td>${p.uc ? fmtMoney(p.uc) : '—'}</td>
-      <td><strong style="color:var(--accent-red)">${fmtMoney(p.total)}</strong></td>
-      <td>${esc(p.seller) || '—'}</td>
-      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.notes) || '—'}</td>
-      <td>
-        <div class="table-actions">
-          <button class="btn btn-outline btn-icon" onclick="editPurchase('${p.id}')"><i class="fa fa-pen"></i></button>
-          <button class="btn btn-red btn-icon" onclick="deletePurchase('${p.id}')"><i class="fa fa-trash"></i></button>
-        </div>
-      </td>
-    </tr>`).join('');
+  const total=state.purchases.reduce((s,x)=>s+(+x.total||0),0);
+  document.getElementById('totalPurchasesSpent').textContent=fmtMoney(total); document.getElementById('totalPurchasesCount').textContent=state.purchases.length;
+  const tbody=document.getElementById('purchaseTableBody');
+  if(!state.purchases.length){tbody.innerHTML='<tr><td colspan="9" class="empty-row">No purchases logged yet.</td></tr>';return;}
+  tbody.innerHTML=[...state.purchases].reverse().map(p=>`
+    <tr><td>${p.date||'—'}</td><td><strong>${esc(p.item)}</strong></td><td>${catBadge(p.cat)}</td><td>${p.qty||1}</td>
+    <td>${p.uc?fmtMoney(p.uc):'—'}</td><td><strong style="color:var(--accent-red)">${fmtMoney(p.total)}</strong></td>
+    <td>${esc(p.seller)||'—'}</td><td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.notes)||'—'}</td>
+    <td><div class="table-actions"><button class="btn btn-outline btn-icon" onclick="editPurchase('${p.id}')"><i class="fa fa-pen"></i></button><button class="btn btn-red btn-icon" onclick="deletePurchase('${p.id}')"><i class="fa fa-trash"></i></button></div></td></tr>`).join('');
 }
 function editPurchase(id) {
-  const p = state.purchases.find(x => x.id === id);
-  if (!p) return;
-  document.getElementById('purchaseId').value = p.id;
-  document.getElementById('purchaseDate').value = p.date;
-  document.getElementById('purchaseItem').value = p.item;
-  document.getElementById('purchaseCat').value = p.cat;
-  document.getElementById('purchaseQty').value = p.qty;
-  document.getElementById('purchaseUC').value = p.uc;
-  document.getElementById('purchaseTotal').value = p.total;
-  document.getElementById('purchaseSeller').value = p.seller;
-  document.getElementById('purchaseNotes').value = p.notes;
-  document.getElementById('purchaseModalTitle').textContent = 'Edit Purchase';
-  openModal('purchaseModal');
+  const p=state.purchases.find(x=>x.id===id);if(!p)return;
+  document.getElementById('purchaseId').value=p.id; document.getElementById('purchaseDate').value=p.date; document.getElementById('purchaseItem').value=p.item;
+  document.getElementById('purchaseCat').value=p.cat; document.getElementById('purchaseQty').value=p.qty; document.getElementById('purchaseUC').value=p.uc;
+  document.getElementById('purchaseTotal').value=p.total; document.getElementById('purchaseSeller').value=p.seller; document.getElementById('purchaseNotes').value=p.notes;
+  document.getElementById('purchaseModalTitle').textContent='Edit Purchase'; openModal('purchaseModal');
 }
 function deletePurchase(id) {
-  confirmDelete(() => {
-    state.purchases = state.purchases.filter(x => x.id !== id);
-    logActivity(`🗑️ Deleted purchase`);
-    renderPurchases(); updateDashStats(); saveState();
-    showToast('Purchase deleted.', 'warning');
+  const p=state.purchases.find(x=>x.id===id);
+  confirmDelete(()=>{
+    const amt=parseFloat(p?.total)||0;
+    state.purchases=state.purchases.filter(x=>x.id!==id);
+    if(amt>0) addWalletTransaction('add',`Deleted purchase refund: ${p?.item}`,amt);
+    logActivity(`🗑️ Deleted purchase: ${p?.item}`); renderPurchases(); updateDashStats(); saveState(); showToast('Purchase deleted (balance refunded).','warning');
   });
 }
 
 // ---------- RENDER FINANCES ----------
 function renderFinances() {
-  const totalIncome = state.sales.reduce((s, x) => s + (+x.total || 0), 0)
-    + state.finances.filter(f => f.type === 'income').reduce((s, x) => s + (+x.amount || 0), 0);
-  const totalExpenses = state.purchases.reduce((s, x) => s + (+x.total || 0), 0)
-    + state.finances.filter(f => f.type === 'expense').reduce((s, x) => s + (+x.amount || 0), 0);
-  const net = totalIncome - totalExpenses;
-
-  document.getElementById('finTotalIncome').textContent = fmtMoney(totalIncome);
-  document.getElementById('finTotalExpenses').textContent = fmtMoney(totalExpenses);
-  const el = document.getElementById('finNetProfit');
-  el.textContent = fmtMoney(net);
-  el.style.color = net >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-
-  const tbody = document.getElementById('financeTableBody');
-  if (!state.finances.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-row">No entries yet.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = [...state.finances].reverse().map(f => `
-    <tr>
-      <td>${f.date || '—'}</td>
-      <td>${f.type === 'income'
-        ? '<span class="badge badge-green">Income</span>'
-        : '<span class="badge badge-red">Expense</span>'}</td>
-      <td>${esc(f.cat)}</td>
-      <td style="color:${f.type === 'income' ? 'var(--accent-green)' : 'var(--accent-red)'}"><strong>${f.type === 'income' ? '+' : '-'}${fmtMoney(f.amount)}</strong></td>
-      <td>${esc(f.desc) || '—'}</td>
-      <td>
-        <button class="btn btn-red btn-icon" onclick="deleteFinance('${f.id}')"><i class="fa fa-trash"></i></button>
-      </td>
-    </tr>`).join('');
+  const totalIncome=state.sales.reduce((s,x)=>s+(+x.total||0),0)+state.finances.filter(f=>f.type==='income').reduce((s,x)=>s+(+x.amount||0),0);
+  const totalExpenses=state.purchases.reduce((s,x)=>s+(+x.total||0),0)+state.finances.filter(f=>f.type==='expense').reduce((s,x)=>s+(+x.amount||0),0);
+  const net=totalIncome-totalExpenses;
+  document.getElementById('finTotalIncome').textContent=fmtMoney(totalIncome); document.getElementById('finTotalExpenses').textContent=fmtMoney(totalExpenses);
+  const el=document.getElementById('finNetProfit'); el.textContent=fmtMoney(net); el.style.color=net>=0?'var(--accent-green)':'var(--accent-red)';
+  const tbody=document.getElementById('financeTableBody');
+  if(!state.finances.length){tbody.innerHTML='<tr><td colspan="6" class="empty-row">No entries yet.</td></tr>';return;}
+  tbody.innerHTML=[...state.finances].reverse().map(f=>`
+    <tr><td>${f.date||'—'}</td><td>${f.type==='income'?'<span class="badge badge-green">Income</span>':'<span class="badge badge-red">Expense</span>'}</td>
+    <td>${esc(f.cat)}</td><td style="color:${f.type==='income'?'var(--accent-green)':'var(--accent-red)'}"><strong>${f.type==='income'?'+':'-'}${fmtMoney(f.amount)}</strong></td>
+    <td>${esc(f.desc)||'—'}</td><td><button class="btn btn-red btn-icon" onclick="deleteFinance('${f.id}')"><i class="fa fa-trash"></i></button></td></tr>`).join('');
 }
 function deleteFinance(id) {
-  confirmDelete(() => {
-    state.finances = state.finances.filter(x => x.id !== id);
-    renderFinances(); updateDashStats(); renderFinanceCharts(); saveState();
-    showToast('Entry deleted.', 'warning');
-  });
+  confirmDelete(()=>{ state.finances=state.finances.filter(x=>x.id!==id); renderFinances(); updateDashStats(); renderFinanceCharts(); saveState(); showToast('Entry deleted.','warning'); });
 }
 
 // ---------- RENDER ANIMALS ----------
 function renderAnimals() {
-  const tbody = document.getElementById('animalTableBody');
-  if (!state.animals.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty-row">No animals added yet.</td></tr>';
-    return;
-  }
-  const animalEmoji = { Cow:'🐄', Sheep:'🐑', Pig:'🐷', Chicken:'🐔', Horse:'🐴', Goat:'🐐', Other:'🐾' };
-  tbody.innerHTML = state.animals.map(a => `
-    <tr>
-      <td>${animalEmoji[a.type] || '🐾'} ${esc(a.type)}</td>
-      <td><strong>${esc(a.name)}</strong></td>
-      <td>${a.count}</td>
-      <td>${esc(a.pen) || '—'}</td>
-      <td>${feedBadge(a.feed)}</td>
-      <td>${esc(a.prod) || '—'}</td>
-      <td>${a.value ? fmtMoney(a.value) : '—'}</td>
-      <td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.notes) || '—'}</td>
-      <td>
-        <div class="table-actions">
-          <button class="btn btn-outline btn-icon" onclick="editAnimal('${a.id}')"><i class="fa fa-pen"></i></button>
-          <button class="btn btn-red btn-icon" onclick="deleteAnimal('${a.id}')"><i class="fa fa-trash"></i></button>
-        </div>
-      </td>
-    </tr>`).join('');
+  const tbody=document.getElementById('animalTableBody');
+  if(!state.animals.length){tbody.innerHTML='<tr><td colspan="9" class="empty-row">No animals added yet.</td></tr>';return;}
+  const em={Cow:'🐄',Sheep:'🐑',Pig:'🐷',Chicken:'🐔',Horse:'🐴',Goat:'🐐',Other:'🐾'};
+  tbody.innerHTML=state.animals.map(a=>`
+    <tr><td>${em[a.type]||'🐾'} ${esc(a.type)}</td><td><strong>${esc(a.name)}</strong></td><td>${a.count}</td>
+    <td>${esc(a.pen)||'—'}</td><td>${feedBadge(a.feed)}</td><td>${esc(a.prod)||'—'}</td>
+    <td>${a.value?fmtMoney(a.value):'—'}</td><td style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.notes)||'—'}</td>
+    <td><div class="table-actions"><button class="btn btn-outline btn-icon" onclick="editAnimal('${a.id}')"><i class="fa fa-pen"></i></button><button class="btn btn-red btn-icon" onclick="deleteAnimal('${a.id}')"><i class="fa fa-trash"></i></button></div></td></tr>`).join('');
 }
 function editAnimal(id) {
-  const a = state.animals.find(x => x.id === id);
-  if (!a) return;
-  document.getElementById('animalId').value = a.id;
-  document.getElementById('animalType').value = a.type;
-  document.getElementById('animalName').value = a.name;
-  document.getElementById('animalCount').value = a.count;
-  document.getElementById('animalPen').value = a.pen;
-  document.getElementById('animalFeed').value = a.feed;
-  document.getElementById('animalProd').value = a.prod;
-  document.getElementById('animalValue').value = a.value;
-  document.getElementById('animalNotes').value = a.notes;
-  document.getElementById('animalModalTitle').textContent = 'Edit Animal';
-  openModal('animalModal');
+  const a=state.animals.find(x=>x.id===id);if(!a)return;
+  document.getElementById('animalId').value=a.id; document.getElementById('animalType').value=a.type; document.getElementById('animalName').value=a.name;
+  document.getElementById('animalCount').value=a.count; document.getElementById('animalPen').value=a.pen; document.getElementById('animalFeed').value=a.feed;
+  document.getElementById('animalProd').value=a.prod; document.getElementById('animalValue').value=a.value; document.getElementById('animalNotes').value=a.notes;
+  document.getElementById('animalModalTitle').textContent='Edit Animal'; openModal('animalModal');
 }
 function deleteAnimal(id) {
-  const a = state.animals.find(x => x.id === id);
-  confirmDelete(() => {
-    state.animals = state.animals.filter(x => x.id !== id);
-    logActivity(`🗑️ Deleted animal: ${a?.name}`);
-    renderAnimals(); saveState();
-    showToast('Animal deleted.', 'warning');
-  });
+  const a=state.animals.find(x=>x.id===id);
+  confirmDelete(()=>{ state.animals=state.animals.filter(x=>x.id!==id); logActivity(`🗑️ Deleted animal: ${a?.name}`); renderAnimals(); saveState(); showToast('Animal deleted.','warning'); });
 }
 
 // ---------- CHARTS ----------
 function renderFinanceBarChart() {
-  const canvas = document.getElementById('financeChart');
-  if (!canvas) return;
-  const totalIncome = state.sales.reduce((s, x) => s + (+x.total || 0), 0)
-    + state.finances.filter(f => f.type === 'income').reduce((s, x) => s + (+x.amount || 0), 0);
-  const totalExpenses = state.purchases.reduce((s, x) => s + (+x.total || 0), 0)
-    + state.finances.filter(f => f.type === 'expense').reduce((s, x) => s + (+x.amount || 0), 0);
-
-  if (financeChartInstance) financeChartInstance.destroy();
-  financeChartInstance = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels: ['Income', 'Expenses', 'Net Profit'],
-      datasets: [{
-        data: [totalIncome, totalExpenses, totalIncome - totalExpenses],
-        backgroundColor: [
-          'rgba(76,175,125,0.7)',
-          'rgba(224,85,85,0.7)',
-          (totalIncome - totalExpenses) >= 0 ? 'rgba(74,144,217,0.7)' : 'rgba(224,85,85,0.7)'
-        ],
-        borderColor: ['#4caf7d','#e05555','#4a90d9'],
-        borderWidth: 2,
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' $' + fmtNum(ctx.raw) } } },
-      scales: {
-        y: { ticks: { color: '#8b8fa8', callback: v => '$' + fmtNum(v) }, grid: { color: '#2d3148' } },
-        x: { ticks: { color: '#8b8fa8' }, grid: { display: false } }
-      }
-    }
-  });
+  const canvas=document.getElementById('financeChart');if(!canvas)return;
+  const totalIncome=state.sales.reduce((s,x)=>s+(+x.total||0),0)+state.finances.filter(f=>f.type==='income').reduce((s,x)=>s+(+x.amount||0),0);
+  const totalExpenses=state.purchases.reduce((s,x)=>s+(+x.total||0),0)+state.finances.filter(f=>f.type==='expense').reduce((s,x)=>s+(+x.amount||0),0);
+  const net=totalIncome-totalExpenses;
+  if(financeChartInstance)financeChartInstance.destroy();
+  financeChartInstance=new Chart(canvas,{type:'bar',data:{labels:['Income','Expenses','Net Profit'],datasets:[{data:[totalIncome,totalExpenses,net],backgroundColor:['rgba(76,175,125,0.7)','rgba(224,85,85,0.7)',net>=0?'rgba(74,144,217,0.7)':'rgba(224,85,85,0.7)'],borderColor:['#4caf7d','#e05555','#4a90d9'],borderWidth:2,borderRadius:6}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' $'+fmtNum(ctx.raw)}}},scales:{y:{ticks:{color:'#8b8fa8',callback:v=>'$'+fmtNum(v)},grid:{color:'#2d3148'}},x:{ticks:{color:'#8b8fa8'},grid:{display:false}}}}});
 }
-
 function renderFinanceCharts() {
   renderFinanceBarChart();
-
-  const canvas = document.getElementById('expenseChart');
-  if (!canvas) return;
-  // Gather expense categories
-  const catMap = {};
-  state.purchases.forEach(p => {
-    catMap[p.cat] = (catMap[p.cat] || 0) + (+p.total || 0);
-  });
-  state.finances.filter(f => f.type === 'expense').forEach(f => {
-    catMap[f.cat] = (catMap[f.cat] || 0) + (+f.amount || 0);
-  });
-  const labels = Object.keys(catMap);
-  const data = Object.values(catMap);
-  const colors = ['#4caf7d','#4a90d9','#e8943a','#e05555','#9b6dce','#3dbfbf','#d4b84a','#e06594','#6dd47e','#f5a623'];
-
-  if (expenseChartInstance) expenseChartInstance.destroy();
-  if (!labels.length) { canvas.parentElement.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:2rem;">No expense data yet.</p>'; return; }
-  expenseChartInstance = new Chart(canvas, {
-    type: 'doughnut',
-    data: {
-      labels,
-      datasets: [{ data, backgroundColor: colors.slice(0, labels.length), borderColor: '#1e2130', borderWidth: 3 }]
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { position: 'right', labels: { color: '#8b8fa8', padding: 12, font: { size: 12 } } },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: $${fmtNum(ctx.raw)}` } }
-      }
-    }
-  });
+  const canvas=document.getElementById('expenseChart');if(!canvas)return;
+  const catMap={};
+  state.purchases.forEach(p=>{catMap[p.cat]=(catMap[p.cat]||0)+(+p.total||0);});
+  state.finances.filter(f=>f.type==='expense').forEach(f=>{catMap[f.cat]=(catMap[f.cat]||0)+(+f.amount||0);});
+  const labels=Object.keys(catMap);const data=Object.values(catMap);
+  const colors=['#4caf7d','#4a90d9','#e8943a','#e05555','#9b6dce','#3dbfbf','#d4b84a','#e06594','#6dd47e','#f5a623'];
+  if(expenseChartInstance)expenseChartInstance.destroy();
+  if(!labels.length){canvas.parentElement.innerHTML='<p style="text-align:center;color:var(--text-muted);padding:2rem;">No expense data yet.</p>';return;}
+  expenseChartInstance=new Chart(canvas,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors.slice(0,labels.length),borderColor:'#1e2130',borderWidth:3}]},options:{responsive:true,plugins:{legend:{position:'right',labels:{color:'#8b8fa8',padding:12,font:{size:12}}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: $${fmtNum(ctx.raw)}`}}}}});
 }
 
 // ---------- RENDER ALL ----------
 function renderAll() {
-  updateDashStats();
-  renderActivity();
-  renderFields();
-  renderEquipment();
-  renderHarvests();
-  renderSales();
-  renderPurchases();
-  renderFinances();
-  renderAnimals();
-  setTimeout(renderFinanceBarChart, 100);
+  updateDashStats(); renderActivity(); renderFields(); renderEquipment();
+  renderHarvests(); renderSales(); renderPurchases(); renderFinances();
+  renderAnimals(); renderWallet(); setTimeout(renderFinanceBarChart, 100);
 }
 
 // ---------- HELPERS ----------
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-function fmtMoney(n) { return '$' + parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function fmtNum(n) { return parseFloat(n || 0).toLocaleString('en-US'); }
-
-function statusBadge(s) {
-  const map = {
-    'Plowed': 'badge-orange', 'Cultivated': 'badge-yellow', 'Seeded': 'badge-blue',
-    'Fertilized': 'badge-teal', 'Growing': 'badge-green', 'Ready to Harvest': 'badge-purple',
-    'Harvested': 'badge-gray', 'Fallow': 'badge-gray'
-  };
-  return `<span class="badge ${map[s] || 'badge-gray'}">${s}</span>`;
-}
-function soilBadge(s) {
-  const map = { 'Poor': 'badge-red', 'Average': 'badge-yellow', 'Good': 'badge-blue', 'Excellent': 'badge-green' };
-  return `<span class="badge ${map[s] || 'badge-gray'}">${s}</span>`;
-}
-function conditionBadge(c) {
-  const map = { 'New': 'badge-green', 'Good': 'badge-blue', 'Fair': 'badge-yellow', 'Needs Repair': 'badge-red' };
-  return `<span class="badge ${map[c] || 'badge-gray'}">${c}</span>`;
-}
-function qualityBadge(q) {
-  const map = { 'Low': 'badge-red', 'Average': 'badge-yellow', 'Good': 'badge-blue', 'Excellent': 'badge-green' };
-  return `<span class="badge ${map[q] || 'badge-gray'}">${q}</span>`;
-}
-function feedBadge(f) {
-  const map = { 'Full': 'badge-green', 'Half': 'badge-blue', 'Low': 'badge-orange', 'Empty': 'badge-red' };
-  return `<span class="badge ${map[f] || 'badge-gray'}">${f}</span>`;
-}
-function catBadge(c) {
-  const map = {
-    'Grain': 'badge-yellow', 'Hay': 'badge-orange', 'Grass / Silage': 'badge-green',
-    'Vegetables / Root Crops': 'badge-teal', 'Equipment': 'badge-blue', 'Animal': 'badge-purple',
-    'Contract': 'badge-teal', 'Seeds': 'badge-green', 'Fertilizer': 'badge-teal',
-    'Herbicide': 'badge-orange', 'Fuel': 'badge-red', 'Field': 'badge-blue',
-    'Animal Feed': 'badge-purple', 'Hired Help': 'badge-yellow', 'Maintenance': 'badge-orange',
-  };
-  return `<span class="badge ${map[c] || 'badge-gray'}">${esc(c)}</span>`;
-}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function fmtMoney(n){return'$'+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtNum(n){return parseFloat(n||0).toLocaleString('en-US');}
+function statusBadge(s){const m={'Plowed':'badge-orange','Cultivated':'badge-yellow','Seeded':'badge-blue','Fertilized':'badge-teal','Growing':'badge-green','Ready to Harvest':'badge-purple','Harvested':'badge-gray','Fallow':'badge-gray'};return`<span class="badge ${m[s]||'badge-gray'}">${s}</span>`;}
+function soilBadge(s){const m={'Poor':'badge-red','Average':'badge-yellow','Good':'badge-blue','Excellent':'badge-green'};return`<span class="badge ${m[s]||'badge-gray'}">${s}</span>`;}
+function conditionBadge(c){const m={'New':'badge-green','Good':'badge-blue','Fair':'badge-yellow','Needs Repair':'badge-red'};return`<span class="badge ${m[c]||'badge-gray'}">${c}</span>`;}
+function qualityBadge(q){const m={'Low':'badge-red','Average':'badge-yellow','Good':'badge-blue','Excellent':'badge-green'};return`<span class="badge ${m[q]||'badge-gray'}">${q}</span>`;}
+function feedBadge(f){const m={'Full':'badge-green','Half':'badge-blue','Low':'badge-orange','Empty':'badge-red'};return`<span class="badge ${m[f]||'badge-gray'}">${f}</span>`;}
+function catBadge(c){const m={'Grain':'badge-yellow','Hay':'badge-orange','Grass / Silage':'badge-green','Vegetables / Root Crops':'badge-teal','Equipment':'badge-blue','Animal':'badge-purple','Contract':'badge-teal','Seeds':'badge-green','Fertilizer':'badge-teal','Herbicide':'badge-orange','Fuel':'badge-red','Field':'badge-blue','Animal Feed':'badge-purple','Hired Help':'badge-yellow','Maintenance':'badge-orange'};return`<span class="badge ${m[c]||'badge-gray'}">${esc(c)}</span>`;}
