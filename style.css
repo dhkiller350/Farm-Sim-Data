@@ -28,9 +28,12 @@
   --emerald: #34d399;
   --pink:    #f472b6;
 
-  --text:     #e4e8f7;
-  --text2:    #8891b0;
-  --text3:    #4e566e;
+  --text:           #e4e8f7;
+  --text2:          #8891b0;
+  --text-secondary: var(--text2);
+  --text3:          #4e566e;
+
+  --accent-red:     var(--red);
 
   --radius:   12px;
   --radius-sm:7px;
