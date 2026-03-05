@@ -454,4 +454,234 @@ function renderHarvests(){
   setEl('harvestCorn',fmtN(g.corn)+' L');setEl('harvestGrass',fmtN(g.grass)+' L');
   setEl('harvestRoot',fmtN(g.root)+' L');setEl('harvestOther',fmtN(g.other)+' L');
   const tbody=document.getElementById('harvestTableBody');
-  if(!state.harvests.length){tbody.innerHTML='<tr><td colspan="
+  if(!state.harvests.length){tbody.innerHTML='<tr><td colspan="8" class="empty-row"><i class="fa fa-wheat-awn"></i> No harvests logged yet.</td></tr>';return}
+  tbody.innerHTML=state.harvests.map(h=>`
+    <tr><td>${h.date||'—'}</td><td>${esc(h.field)}</td><td>${esc(h.crop)}</td>
+    <td>${fmtN(+h.amount||0)} L</td><td>${qualityBadge(h.quality)}</td>
+    <td>${h.sold==='Yes'?'<span class="badge badge-green">Yes</span>':'<span class="badge badge-gray">No</span>'}</td>
+    <td class="td-notes">${esc(h.notes)||'—'}</td>
+    <td><div class="table-actions">
+      <button class="btn btn-outline btn-icon btn-xs" onclick="editHarvest('${h.id}')"><i class="fa fa-pen"></i></button>
+      <button class="btn btn-danger btn-icon btn-xs" onclick="deleteHarvest('${h.id}')"><i class="fa fa-trash"></i></button>
+    </div></td></tr>`).join('');
+}
+function editHarvest(id){
+  const h=state.harvests.find(x=>x.id===id);if(!h)return;
+  setEl_val('harvestId',h.id);setEl_val('harvestDate',h.date);setEl_val('harvestField',h.field);
+  setEl_val('harvestCrop',h.crop);setEl_val('harvestAmount',h.amount);setEl_val('harvestQuality',h.quality);
+  setEl_val('harvestSold',h.sold);setEl_val('harvestNotes',h.notes);
+  document.getElementById('harvestModalTitle').innerHTML='<i class="fa fa-pen"></i> Edit Harvest';
+  openModal('harvestModal');
+}
+function deleteHarvest(id){
+  const h=state.harvests.find(x=>x.id===id);
+  confirmDelete(()=>{state.harvests=state.harvests.filter(x=>x.id!==id);logActivity('🗑️ Deleted harvest');renderHarvests();updateDashStats();saveState(true);showToast('Harvest deleted.','warning')});
+}
+
+// ---------- RENDER SALES ----------
+function renderSales(){
+  const tbody=document.getElementById('salesTableBody');
+  const total=state.sales.reduce((s,x)=>s+(+x.total||0),0);
+  setEl('totalSalesRevenue',fmt$(total));
+  setEl('totalSalesCount',state.sales.length);
+  if(!state.sales.length){tbody.innerHTML='<tr><td colspan="9" class="empty-row"><i class="fa fa-dollar-sign"></i> No sales logged yet.</td></tr>';return}
+  tbody.innerHTML=state.sales.map(s=>`
+    <tr><td>${s.date||'—'}</td><td><strong>${esc(s.item)}</strong></td><td>${esc(s.cat)}</td>
+    <td>${s.amt?fmtN(+s.amt)+' L':'—'}</td><td>${s.ppu?fmt$(s.ppu):'—'}</td>
+    <td style="color:var(--green);font-weight:700">${fmt$(s.total)}</td>
+    <td>${esc(s.buyer)||'—'}</td><td class="td-notes">${esc(s.notes)||'—'}</td>
+    <td><div class="table-actions">
+      <button class="btn btn-outline btn-icon btn-xs" onclick="editSale('${s.id}')"><i class="fa fa-pen"></i></button>
+      <button class="btn btn-danger btn-icon btn-xs" onclick="deleteSale('${s.id}')"><i class="fa fa-trash"></i></button>
+    </div></td></tr>`).join('');
+}
+function editSale(id){
+  const s=state.sales.find(x=>x.id===id);if(!s)return;
+  setEl_val('saleId',s.id);setEl_val('saleDate',s.date);setEl_val('saleItem',s.item);
+  setEl_val('saleCat',s.cat);setEl_val('saleAmt',s.amt);setEl_val('salePPU',s.ppu);
+  setEl_val('saleTotal',s.total);setEl_val('saleBuyer',s.buyer);setEl_val('saleNotes',s.notes);
+  document.getElementById('saleModalTitle').innerHTML='<i class="fa fa-pen"></i> Edit Sale';
+  openModal('saleModal');
+}
+function deleteSale(id){
+  const s=state.sales.find(x=>x.id===id);
+  confirmDelete(()=>{
+    const amt=parseFloat(s?.total)||0;
+    if(amt>0)addWalletTx('sale',`Sale deleted: ${s?.item}`,-amt);
+    state.sales=state.sales.filter(x=>x.id!==id);
+    logActivity(`🗑️ Deleted sale: ${s?.item}`);
+    renderSales();updateDashStats();saveState(true);showToast('Sale deleted.','warning');
+  });
+}
+
+// ---------- RENDER PURCHASES ----------
+function renderPurchases(){
+  const tbody=document.getElementById('purchaseTableBody');
+  const total=state.purchases.reduce((s,x)=>s+(+x.total||0),0);
+  setEl('totalPurchasesSpent',fmt$(total));
+  setEl('totalPurchasesCount',state.purchases.length);
+  if(!state.purchases.length){tbody.innerHTML='<tr><td colspan="9" class="empty-row"><i class="fa fa-shopping-cart"></i> No purchases logged yet.</td></tr>';return}
+  tbody.innerHTML=state.purchases.map(p=>`
+    <tr><td>${p.date||'—'}</td><td><strong>${esc(p.item)}</strong></td><td>${esc(p.cat)}</td>
+    <td>${p.qty||'—'}</td><td>${p.uc?fmt$(p.uc):'—'}</td>
+    <td style="color:var(--red);font-weight:700">${fmt$(p.total)}</td>
+    <td>${esc(p.seller)||'—'}</td><td class="td-notes">${esc(p.notes)||'—'}</td>
+    <td><div class="table-actions">
+      <button class="btn btn-outline btn-icon btn-xs" onclick="editPurchase('${p.id}')"><i class="fa fa-pen"></i></button>
+      <button class="btn btn-danger btn-icon btn-xs" onclick="deletePurchase('${p.id}')"><i class="fa fa-trash"></i></button>
+    </div></td></tr>`).join('');
+}
+function editPurchase(id){
+  const p=state.purchases.find(x=>x.id===id);if(!p)return;
+  setEl_val('purchaseId',p.id);setEl_val('purchaseDate',p.date);setEl_val('purchaseItem',p.item);
+  setEl_val('purchaseCat',p.cat);setEl_val('purchaseQty',p.qty);setEl_val('purchaseUC',p.uc);
+  setEl_val('purchaseTotal',p.total);setEl_val('purchaseSeller',p.seller);setEl_val('purchaseNotes',p.notes);
+  document.getElementById('purchaseModalTitle').innerHTML='<i class="fa fa-pen"></i> Edit Purchase';
+  openModal('purchaseModal');
+}
+function deletePurchase(id){
+  const p=state.purchases.find(x=>x.id===id);
+  confirmDelete(()=>{
+    const amt=parseFloat(p?.total)||0;
+    if(amt>0)addWalletTx('purchase',`Purchase deleted: ${p?.item}`,amt);
+    state.purchases=state.purchases.filter(x=>x.id!==id);
+    logActivity(`🗑️ Deleted purchase: ${p?.item}`);
+    renderPurchases();updateDashStats();saveState(true);showToast('Purchase deleted.','warning');
+  });
+}
+
+// ---------- RENDER FINANCES ----------
+function renderFinances(){
+  const tbody=document.getElementById('financeTableBody');
+  const income=state.finances.filter(f=>f.type==='income').reduce((s,f)=>s+(+f.amount||0),0);
+  const expenses=state.finances.filter(f=>f.type==='expense').reduce((s,f)=>s+(+f.amount||0),0);
+  setEl('finTotalIncome',fmt$(income));
+  setEl('finTotalExpenses',fmt$(expenses));
+  const npEl=document.getElementById('finNetProfit');
+  if(npEl){const net=income-expenses;npEl.textContent=fmt$(net);npEl.style.color=net>=0?'var(--green)':'var(--red)'}
+  if(!state.finances.length){tbody.innerHTML='<tr><td colspan="6" class="empty-row">No entries yet.</td></tr>';return}
+  tbody.innerHTML=[...state.finances].reverse().map(f=>`
+    <tr>
+    <td>${f.date||'—'}</td>
+    <td>${f.type==='income'?'<span class="badge badge-green">Income</span>':'<span class="badge badge-red">Expense</span>'}</td>
+    <td>${esc(f.cat)}</td>
+    <td style="font-weight:700;color:${f.type==='income'?'var(--green)':'var(--red)'}">${f.type==='income'?'+':'−'}${fmt$(f.amount)}</td>
+    <td class="td-notes">${esc(f.desc)||'—'}</td>
+    <td><button class="btn btn-danger btn-icon btn-xs" onclick="deleteFinance('${f.id}')"><i class="fa fa-trash"></i></button></td>
+    </tr>`).join('');
+}
+function deleteFinance(id){
+  confirmDelete(()=>{state.finances=state.finances.filter(x=>x.id!==id);renderFinances();renderFinanceCharts();saveState(true);showToast('Entry deleted.','warning')});
+}
+function renderFinanceCharts(){
+  const expenses=state.finances.filter(f=>f.type==='expense');
+  const catTotals={};
+  expenses.forEach(f=>{catTotals[f.cat]=(catTotals[f.cat]||0)+(+f.amount||0)});
+  const labels=Object.keys(catTotals);
+  const data=Object.values(catTotals);
+  const colors=['#22c55e','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899','#14b8a6','#a3e635','#6b7280','#84cc16'];
+  const ctx=document.getElementById('expenseChart');
+  if(!ctx)return;
+  if(expChart)expChart.destroy();
+  if(!labels.length){expChart=null;return}
+  expChart=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors.slice(0,labels.length),borderWidth:2}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#94a3b8',font:{size:11}}}}}});
+}
+
+// ---------- RENDER ANIMALS ----------
+function renderAnimals(){
+  const tbody=document.getElementById('animalTableBody');
+  setEl('animalCount',state.animals.length);
+  if(!state.animals.length){tbody.innerHTML='<tr><td colspan="9" class="empty-row"><i class="fa fa-horse"></i> No animals added yet.</td></tr>';return}
+  tbody.innerHTML=state.animals.map(a=>`
+    <tr><td>${esc(a.type)}</td><td><strong>${esc(a.name)}</strong></td><td>${a.count||1}</td>
+    <td>${esc(a.pen)||'—'}</td><td>${feedBadge(a.feed)}</td>
+    <td>${esc(a.prod)||'—'}</td><td>${a.value?fmt$(a.value):'—'}</td>
+    <td class="td-notes">${esc(a.notes)||'—'}</td>
+    <td><div class="table-actions">
+      <button class="btn btn-outline btn-icon btn-xs" onclick="editAnimal('${a.id}')"><i class="fa fa-pen"></i></button>
+      <button class="btn btn-danger btn-icon btn-xs" onclick="deleteAnimal('${a.id}')"><i class="fa fa-trash"></i></button>
+    </div></td></tr>`).join('');
+}
+function editAnimal(id){
+  const a=state.animals.find(x=>x.id===id);if(!a)return;
+  setEl_val('animalId',a.id);setEl_val('animalType',a.type);setEl_val('animalName',a.name);
+  setEl_val('animalCount',a.count);setEl_val('animalPen',a.pen);setEl_val('animalFeed',a.feed);
+  setEl_val('animalProd',a.prod);setEl_val('animalValue',a.value);setEl_val('animalNotes',a.notes);
+  document.getElementById('animalModalTitle').innerHTML='<i class="fa fa-pen"></i> Edit Animal';
+  openModal('animalModal');
+}
+function deleteAnimal(id){
+  const a=state.animals.find(x=>x.id===id);
+  confirmDelete(()=>{state.animals=state.animals.filter(x=>x.id!==id);logActivity(`🗑️ Deleted animal: ${a?.name}`);renderAnimals();updateDashStats();saveState(true);showToast('Animal deleted.','warning')});
+}
+
+// ---------- FINANCE BAR CHART (DASHBOARD) ----------
+function renderFinanceBarChart(){
+  const ctx=document.getElementById('financeChart');
+  if(!ctx)return;
+  const income=state.finances.filter(f=>f.type==='income').reduce((s,f)=>s+(+f.amount||0),0);
+  const expenses=state.finances.filter(f=>f.type==='expense').reduce((s,f)=>s+(+f.amount||0),0);
+  const salesIncome=state.sales.reduce((s,x)=>s+(+x.total||0),0);
+  const purchExpense=state.purchases.reduce((s,x)=>s+(+x.total||0),0);
+  const totalIncome=income+salesIncome;
+  const totalExpense=expenses+purchExpense;
+  const net=totalIncome-totalExpense;
+  if(finChart)finChart.destroy();
+  finChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:['Income','Expenses','Net'],
+      datasets:[{data:[totalIncome,totalExpense,net],backgroundColor:['rgba(34,197,94,0.8)','rgba(239,68,68,0.8)',net>=0?'rgba(59,130,246,0.8)':'rgba(239,68,68,0.5)'],borderRadius:6,borderWidth:0}]
+    },
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>'$'+fmtN(v),color:'#94a3b8'},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#94a3b8'},grid:{display:false}}}}
+  });
+}
+
+// ---------- RENDER ALL ----------
+function renderAll(){
+  updateDashStats();
+  renderWallet();
+  renderFields();
+  renderEquipment();
+  renderHarvests();
+  renderSales();
+  renderPurchases();
+  renderFinances();
+  renderAnimals();
+  renderActivity();
+}
+
+// ---------- QUICK ACTION HANDLERS ----------
+const MODAL_OPEN_DELAY=200;
+function quickNavWallet(){navigateTo('wallet')}
+function quickNavEquipment(){navigateTo('equipment');setTimeout(()=>document.getElementById('addEquipBtn').click(),MODAL_OPEN_DELAY)}
+function quickNavSales(){navigateTo('sales');setTimeout(()=>document.getElementById('addSaleBtn').click(),MODAL_OPEN_DELAY)}
+function quickNavPurchases(){navigateTo('purchases');setTimeout(()=>document.getElementById('addPurchaseBtn').click(),MODAL_OPEN_DELAY)}
+function quickNavCrops(){navigateTo('crops');setTimeout(()=>document.getElementById('addHarvestBtn').click(),MODAL_OPEN_DELAY)}
+function quickNavAnimals(){navigateTo('animals');setTimeout(()=>document.getElementById('addAnimalBtn').click(),MODAL_OPEN_DELAY)}
+
+// ---------- UTILITIES ----------
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function val(id){const el=document.getElementById(id);return el?el.value:''}
+function setEl(id,txt){const el=document.getElementById(id);if(el)el.textContent=txt}
+function setEl_val(id,v){const el=document.getElementById(id);if(el)el.value=v??''}
+function fmt$(n){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(+n||0)}
+function fmtN(n){return new Intl.NumberFormat('en-US').format(Math.round(+n||0))}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function onBtn(id,fn){const el=document.getElementById(id);if(el)el.addEventListener('click',fn)}
+function resetForm(id){const el=document.getElementById(id);if(el)el.reset()}
+function statusBadge(s){
+  const m={Plowed:'badge-blue',Cultivated:'badge-blue',Seeded:'badge-blue',Fertilized:'badge-purple',Growing:'badge-green','Ready to Harvest':'badge-yellow',Harvested:'badge-emerald',Fallow:'badge-gray'};
+  return'<span class="badge '+(m[s]||'badge-gray')+'">'+(s||'—')+'</span>'}
+function soilBadge(s){
+  const m={Poor:'badge-red',Average:'badge-yellow',Good:'badge-green',Excellent:'badge-emerald'};
+  return'<span class="badge '+(m[s]||'badge-gray')+'">'+(s||'—')+'</span>'}
+function condBadge(s){
+  const m={New:'badge-emerald',Good:'badge-green',Fair:'badge-yellow','Needs Repair':'badge-red'};
+  return'<span class="badge '+(m[s]||'badge-gray')+'">'+(s||'—')+'</span>'}
+function qualityBadge(s){
+  const m={Low:'badge-red',Average:'badge-blue',Good:'badge-green',Excellent:'badge-emerald'};
+  return'<span class="badge '+(m[s]||'badge-gray')+'">'+(s||'—')+'</span>'}
+function feedBadge(s){
+  const m={Full:'badge-green',Half:'badge-yellow',Low:'badge-orange',Empty:'badge-red'};
+  return'<span class="badge '+(m[s]||'badge-gray')+'">'+(s||'—')+'</span>'}
