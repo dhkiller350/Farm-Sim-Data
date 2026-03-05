@@ -856,3 +856,26 @@ function conditionBadge(c){const m={'New':'badge-green','Good':'badge-blue','Fai
 function qualityBadge(q){const m={'Low':'badge-red','Average':'badge-yellow','Good':'badge-blue','Excellent':'badge-green'};return`<span class="badge ${m[q]||'badge-gray'}">${q}</span>`;}
 function feedBadge(f){const m={'Full':'badge-green','Half':'badge-blue','Low':'badge-orange','Empty':'badge-red'};return`<span class="badge ${m[f]||'badge-gray'}">${f}</span>`;}
 function catBadge(c){const m={'Grain':'badge-yellow','Hay':'badge-orange','Grass / Silage':'badge-green','Vegetables / Root Crops':'badge-teal','Equipment':'badge-blue','Animal':'badge-purple','Contract':'badge-teal','Seeds':'badge-green','
+
+                              /* ========= (append to existing style.css) ========= */
+
+/* Reset warning box inside modal */
+.reset-warning-box {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: rgba(224, 85, 85, 0.08);
+  border: 1px solid rgba(224, 85, 85, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  color: var(--accent-red);
+  font-size: 0.9rem;
+}
+.reset-warning-box i {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+.reset-warning-box strong {
+  color: var(--accent-red);
+}
